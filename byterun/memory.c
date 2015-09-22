@@ -406,6 +406,13 @@ CAMLexport value caml_alloc_shr (mlsize_t wosize, tag_t tag)
 {
   char *hp, *new_block;
 
+  if (caml_profile_counts) {
+    if (!profile_pc)
+      caml_profile_counts[0] += wosize;
+    else
+      caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;
+  }
+
   if (wosize > Max_wosize) caml_raise_out_of_memory ();
   hp = caml_fl_allocate (wosize);
   if (hp == NULL){

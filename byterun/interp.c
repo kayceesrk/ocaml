@@ -67,7 +67,7 @@ sp is a local copy of the global variable caml_extern_sp. */
 #define Restore_after_gc \
   { accu = sp[0]; env = sp[1]; sp += 2; }
 #define Setup_for_c_call \
-  { profile_pc = saved_pc = pc; *--sp = env; caml_extern_sp = sp; }
+  { saved_pc = pc; profile_pc = pc - 1; *--sp = env; caml_extern_sp = sp; }
 #define Restore_after_c_call \
   { sp = caml_extern_sp; env = *sp++; profile_pc = saved_pc = NULL; }
 
