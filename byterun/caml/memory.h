@@ -27,6 +27,7 @@
 /* </private> */
 #include "misc.h"
 #include "mlvalues.h"
+#include "stdio.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,7 +52,7 @@ color_t caml_allocation_color (void *hp);
 /* void caml_shrink_heap (char *);        Only used in compact.c */
 
 /* <private> */
-  
+
 #ifdef DEBUG
 #define DEBUG_clear(result, wosize) do{ \
   uintnat caml__DEBUG_i; \
@@ -63,9 +64,19 @@ color_t caml_allocation_color (void *hp);
 #define DEBUG_clear(result, wosize)
 #endif
 
+extern unsigned int* caml_profile_counts;
+extern code_t profile_pc;
+extern code_t caml_start_code;
+
 #define Alloc_small(result, wosize, tag) do{    CAMLassert ((wosize) >= 1); \
                                           CAMLassert ((tag_t) (tag) < 256); \
                                  CAMLassert ((wosize) <= Max_young_wosize); \
+  if (caml_profile_counts) {                                                \
+    if (!profile_pc)                                                        \
+      caml_profile_counts[0] += wosize;                                     \
+    else                                                                    \
+      caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;  \
+  }                                                                         \
   caml_young_ptr -= Bhsize_wosize (wosize);                                 \
   if (caml_young_ptr < caml_young_start){                                   \
     caml_young_ptr += Bhsize_wosize (wosize);                               \

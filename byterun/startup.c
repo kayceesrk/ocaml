@@ -61,6 +61,7 @@
 #define SEEK_END 2
 #endif
 
+unsigned int *caml_profile_counts = NULL;
 extern int caml_parser_trace;
 
 CAMLexport header_t caml_atom_table[256];
@@ -411,6 +412,10 @@ CAMLexport void caml_main(char **argv)
   /* Load the code */
   caml_code_size = caml_seek_section(fd, &trail, "CODE");
   caml_load_code(fd, caml_code_size);
+  /* Initialize the profiler */
+  caml_profile_counts =
+    (unsigned int *) caml_stat_alloc (caml_code_size * sizeof(unsigned int));
+  for (int i = 0; i < caml_code_size; i++) caml_profile_counts[i] = 0;
   /* Build the table of primitives */
   shared_lib_path = read_section(fd, &trail, "DLPT");
   shared_libs = read_section(fd, &trail, "DLLS");
@@ -439,6 +444,17 @@ CAMLexport void caml_main(char **argv)
   /* Execute the program */
   caml_debugger(PROGRAM_START);
   res = caml_interprete(caml_start_code, caml_code_size);
+  /* Output profile */
+  char* prof_file = getenv("CAML_PROFILE_ALLOC");
+  if (prof_file != NULL) {
+    FILE* fp = fopen (prof_file, "w");
+    for (int i = 0; i < caml_code_size; i++) {
+      if (caml_profile_counts[i] != 0)
+        fprintf (fp, "%d\t%u\n", i,caml_profile_counts[i]);
+    }
+    fflush(fp);
+    fclose(fp);
+  }
   if (Is_exception_result(res)) {
     caml_exn_bucket = Extract_exception(res);
     if (caml_debugger_in_use) {
