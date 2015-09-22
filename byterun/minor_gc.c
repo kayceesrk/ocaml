@@ -228,6 +228,7 @@ void caml_empty_minor_heap (void)
   value **r;
   uintnat prev_alloc_words;
 
+  profile_pc = NULL;
   if (caml_young_ptr != caml_young_end){
     if (caml_minor_gc_begin_hook != NULL) (*caml_minor_gc_begin_hook) ();
     prev_alloc_words = caml_allocated_words;
