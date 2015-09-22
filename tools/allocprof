@@ -20,6 +20,8 @@ with open(sys.argv[1]) as tsv:
     # Print output
     locale.setlocale(locale.LC_ALL, 'en_US')
     print "Total: " + locale.format("%d", totalWords, grouping=True) + " words"
+    print "Instr\tWords\t% of total"
+    print "-----\t-----\t----------"
     for line in lines:
         print ("%d" % line[0] + "\t" + "%d" % line[1] + "\t" +
                "%.2f" % (float(line[1]) * 100.0 / totalWords) + "%")
