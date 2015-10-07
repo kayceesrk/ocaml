@@ -415,9 +415,10 @@ CAMLexport void caml_main(char **argv)
   /* Initialize the profiler */
   char* prof_file = getenv("CAML_PROFILE_ALLOC");
   if (prof_file != NULL) {
+    int i;
     caml_profile_counts =
       (unsigned int *) caml_stat_alloc (caml_code_size * sizeof(unsigned int));
-    for (int i = 0; i < caml_code_size; i++) caml_profile_counts[i] = 0;
+    for (i = 0; i < caml_code_size; i++) caml_profile_counts[i] = 0;
   }
   /* Build the table of primitives */
   shared_lib_path = read_section(fd, &trail, "DLPT");
@@ -449,8 +450,9 @@ CAMLexport void caml_main(char **argv)
   res = caml_interprete(caml_start_code, caml_code_size);
   /* Output profile */
   if (prof_file != NULL) {
+    int i;
     FILE* fp = fopen (prof_file, "w");
-    for (int i = 0; i < caml_code_size; i++) {
+    for (i = 0; i < caml_code_size; i++) {
       if (caml_profile_counts[i] != 0)
         fprintf (fp, "%d\t%u\n", i,caml_profile_counts[i]);
     }
