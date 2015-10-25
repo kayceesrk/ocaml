@@ -197,3 +197,9 @@ void caml_startup(char **argv)
 {
   caml_main(argv);
 }
+
+CAMLprim value caml_output_profile (value unit) {
+  CAMLparam1 (unit);
+  fprintf (stderr, "output_profile: allocation profiling not implemented for native code\n");
+  CAMLreturn (Val_unit);
+}

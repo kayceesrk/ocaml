@@ -63,6 +63,7 @@
 
 unsigned int *caml_profile_counts = NULL;
 extern int caml_parser_trace;
+char* prof_file = NULL;
 
 CAMLexport header_t caml_atom_table[256];
 
@@ -413,7 +414,7 @@ CAMLexport void caml_main(char **argv)
   caml_code_size = caml_seek_section(fd, &trail, "CODE");
   caml_load_code(fd, caml_code_size);
   /* Initialize the profiler */
-  char* prof_file = getenv("CAML_PROFILE_ALLOC");
+  prof_file = getenv("CAML_PROFILE_ALLOC");
   if (prof_file != NULL) {
     int i;
     caml_profile_counts =
@@ -546,4 +547,20 @@ CAMLexport void caml_startup_code(
     }
     caml_fatal_uncaught_exception(caml_exn_bucket);
   }
+}
+
+CAMLprim value caml_output_profile (value unit) {
+  CAMLparam1 (unit);
+  fprintf (stderr, "prof_file=%p\n",prof_file);
+  if (prof_file != NULL) {
+    int i;
+    FILE* fp = fopen (prof_file, "w");
+    for (i = 0; i < caml_code_size; i++) {
+      if (caml_profile_counts[i] != 0)
+        fprintf (fp, "%d\t%u\n", i,caml_profile_counts[i]);
+    }
+    fflush(fp);
+    fclose(fp);
+  }
+  CAMLreturn (Val_unit);
 }
