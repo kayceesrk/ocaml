@@ -28,7 +28,6 @@
 #include "misc.h"
 #include "mlvalues.h"
 #include "stdio.h"
-#include "backtrace.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +44,7 @@ CAMLextern value caml_check_urgent_gc (value);
 CAMLextern void * caml_stat_alloc (asize_t);              /* Size in bytes. */
 CAMLextern void caml_stat_free (void *);
 CAMLextern void * caml_stat_resize (void *, asize_t);     /* Size in bytes. */
+CAMLextern void caml_update_stack_profile (mlsize_t);
 char *caml_alloc_for_heap (asize_t request);   /* Size in bytes. */
 void caml_free_for_heap (char *mem);
 int caml_add_to_heap (char *mem);

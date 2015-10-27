@@ -37,8 +37,8 @@ struct loc_info {
   int loc_endchr;
 };
 
-void extract_location_info(code_t pc, int get_containing,
-                           /*out*/ struct loc_info * li);
+void extract_containing_location_info(code_t pc, int get_containing,
+                                      /*out*/ struct loc_info * li);
 char* read_debug_info_with_error (void);
 void caml_update_stack_profile (mlsize_t wosize);
 

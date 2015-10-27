@@ -372,7 +372,7 @@ CAMLprim value caml_output_profile (value unit) {
       if (caml_profile_counts[i] != 0 ||
           (caml_profile_stack_counts &&
            caml_profile_stack_counts[i] != 0)) {
-        extract_location_info (caml_start_code + i, 1, &li);
+        extract_containing_location_info (caml_start_code + i, 1, &li);
         if (li.loc_valid) {
           if (caml_profile_stack_depth) {
             fprintf (fp, "%d\t%u\t%u\tfile \"%s\", line %d, characters %d-%d\n",
