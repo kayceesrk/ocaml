@@ -25,6 +25,7 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/signals.h"
+#include "caml/backtrace.h"
 
 extern uintnat caml_percent_free;                   /* major_gc.c */
 
@@ -406,8 +407,13 @@ CAMLexport value caml_alloc_shr (mlsize_t wosize, tag_t tag)
 {
   char *hp, *new_block;
 
-  if (caml_profile_counts && profile_pc)
+  if (caml_profile_counts && profile_pc) {
     caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;
+    if (caml_profile_stack_depth) {
+      caml_update_stack_profile (caml_profile_stack_depth, wosize,
+                                 caml_profile_stack_counts);
+    }
+  }
 
   if (wosize > Max_wosize) caml_raise_out_of_memory ();
   hp = caml_fl_allocate (wosize);

@@ -196,6 +196,22 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
   CAMLreturn(trace);
 }
 
+void caml_update_stack_profile (long max_frames, mlsize_t wosize,
+                                unsigned int* caml_profile_stack_counts)
+{
+  value* sp = caml_extern_sp;
+  value* trsp = caml_trapsp;
+  long i;
+
+  for (i = 0; i < max_frames; i++) {
+    code_t p = caml_next_frame_pointer (&sp, &trsp);
+    if (p == NULL) {
+      return;
+    }
+    caml_profile_stack_counts[p - caml_start_code] += wosize;
+  }
+}
+
 /* Read the debugging info contained in the current bytecode executable. */
 
 #ifndef O_BINARY

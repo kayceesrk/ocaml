@@ -28,6 +28,7 @@
 #include "misc.h"
 #include "mlvalues.h"
 #include "stdio.h"
+#include "backtrace.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,14 +66,21 @@ color_t caml_allocation_color (void *hp);
 #endif
 
 extern unsigned int* caml_profile_counts;
+extern unsigned int* caml_profile_stack_counts;
+extern long caml_profile_stack_depth;
 extern code_t profile_pc;
 extern code_t caml_start_code;
+extern value* caml_extern_sp;
 
 #define Alloc_small(result, wosize, tag) do{    CAMLassert ((wosize) >= 1); \
                                           CAMLassert ((tag_t) (tag) < 256); \
                                  CAMLassert ((wosize) <= Max_young_wosize); \
   if (caml_profile_counts && profile_pc) {                                  \
     caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;    \
+    if (caml_profile_stack_depth) {                                         \
+      caml_update_stack_profile (caml_profile_stack_depth, wosize,          \
+                                 caml_profile_stack_counts);                \
+    }                                                                       \
   }                                                                         \
   caml_young_ptr -= Bhsize_wosize (wosize);                                 \
   if (caml_young_ptr < caml_young_start){                                   \

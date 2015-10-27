@@ -95,6 +95,12 @@ sp is a local copy of the global variable caml_extern_sp. */
      caml_extern_sp = sp; }
 #define Restore_after_debugger { sp += 4; }
 
+/* Profiler support */
+#define Alloc_small_save_sp(result, wosize, tag) do { \
+  caml_extern_sp = sp;  \
+  Alloc_small(result, wosize, tag); \
+} while(0)
+
 #ifdef THREADED_CODE
 #define Restart_curr_instr \
   goto *(jumptable[caml_saved_code[pc - 1 - caml_start_code]])
@@ -509,7 +515,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       } else {
         mlsize_t num_args, i;
         num_args = 1 + extra_args; /* arg1 + extra args */
-        Alloc_small(accu, num_args + 2, Closure_tag);
+        Alloc_small_save_sp(accu, num_args + 2, Closure_tag);
         Field(accu, 1) = env;
         for (i = 0; i < num_args; i++) Field(accu, i + 2) = sp[i];
         Code_val(accu) = pc - 3; /* Point to the preceding RESTART instr. */
@@ -529,7 +535,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       if (nvars > 0) *--sp = accu;
       if (nvars < Max_young_wosize) {
         /* nvars + 1 <= Max_young_wosize, can allocate in minor heap */
-        Alloc_small(accu, 1 + nvars, Closure_tag);
+        Alloc_small_save_sp(accu, 1 + nvars, Closure_tag);
         for (i = 0; i < nvars; i++) Field(accu, i + 1) = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
@@ -555,7 +561,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       value * p;
       if (nvars > 0) *--sp = accu;
       if (blksize <= Max_young_wosize) {
-        Alloc_small(accu, blksize, Closure_tag);
+        Alloc_small_save_sp(accu, blksize, Closure_tag);
         p = &Field(accu, nfuncs * 2 - 1);
         for (i = 0; i < nvars; i++, p++) *p = sp[i];
       } else {
@@ -651,7 +657,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       mlsize_t i;
       value block;
       if (wosize <= Max_young_wosize) {
-        Alloc_small(block, wosize, tag);
+        Alloc_small_save_sp(block, wosize, tag);
         Field(block, 0) = accu;
         for (i = 1; i < wosize; i++) Field(block, i) = *sp++;
       } else {
@@ -666,7 +672,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       profile_pc = pc - 1;
       tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 1, tag);
+      Alloc_small_save_sp(block, 1, tag);
       Field(block, 0) = accu;
       accu = block;
       Next;
@@ -675,7 +681,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       profile_pc = pc - 1;
       tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 2, tag);
+      Alloc_small_save_sp(block, 2, tag);
       Field(block, 0) = accu;
       Field(block, 1) = sp[0];
       sp += 1;
@@ -686,7 +692,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       profile_pc = pc - 1;
       tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 3, tag);
+      Alloc_small_save_sp(block, 3, tag);
       Field(block, 0) = accu;
       Field(block, 1) = sp[0];
       Field(block, 2) = sp[1];
@@ -700,7 +706,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       mlsize_t i;
       value block;
       if (size <= Max_young_wosize / Double_wosize) {
-        Alloc_small(block, size * Double_wosize, Double_array_tag);
+        Alloc_small_save_sp(block, size * Double_wosize, Double_array_tag);
       } else {
         block = caml_alloc_shr(size * Double_wosize, Double_array_tag);
       }
@@ -728,7 +734,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(GETFLOATFIELD): {
       profile_pc = pc - 1;
       double d = Double_field(accu, *pc);
-      Alloc_small(accu, Double_wosize, Double_tag);
+      Alloc_small_save_sp(accu, Double_wosize, Double_tag);
       Store_double_val(accu, d);
       pc++;
       Next;
