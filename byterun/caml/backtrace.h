@@ -40,7 +40,6 @@ struct loc_info {
 void extract_location_info(code_t pc, int get_containing,
                            /*out*/ struct loc_info * li);
 char* read_debug_info_with_error (void);
-void caml_update_stack_profile (long max_frames, mlsize_t wosize,
-                                unsigned int* caml_profile_stack_counts);
+void caml_update_stack_profile (mlsize_t wosize);
 
 #endif /* CAML_BACKTRACE_H */

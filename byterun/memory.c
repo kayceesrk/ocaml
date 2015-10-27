@@ -410,8 +410,7 @@ CAMLexport value caml_alloc_shr (mlsize_t wosize, tag_t tag)
   if (caml_profile_counts && profile_pc) {
     caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;
     if (caml_profile_stack_depth) {
-      caml_update_stack_profile (caml_profile_stack_depth, wosize,
-                                 caml_profile_stack_counts);
+      caml_update_stack_profile (wosize);
     }
   }
 

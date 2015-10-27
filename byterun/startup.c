@@ -66,6 +66,7 @@
 unsigned int *caml_profile_counts = NULL;
 unsigned int *caml_profile_stack_counts = NULL;
 long caml_profile_stack_depth = 0;
+code_t *caml_profile_stack_info = NULL;
 
 extern int caml_parser_trace;
 char* prof_file = NULL;
@@ -506,6 +507,8 @@ CAMLexport void caml_main(char **argv)
     if (caml_profile_stack_depth) {
       caml_profile_stack_counts =
         (unsigned int *) caml_stat_alloc (caml_code_size * sizeof(unsigned int));
+      caml_profile_stack_info =
+        (code_t*) caml_stat_alloc (caml_profile_stack_depth * sizeof(code_t));
     }
     for (i = 0; i < caml_code_size; i++) {
       caml_profile_counts[i] = 0;

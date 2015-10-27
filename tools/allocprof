@@ -16,11 +16,9 @@ args = parser.parse_args()
 def stack_profile(tsv):
     lines = []
     totalWords = 0
-    totalStackWords = 0
     for line in csv.reader(tsv, dialect="excel-tab"):
         lines.append([int(line[0]), int(line[1]), int(line[2]), line[3]])
         totalWords += int(line[1])
-        totalStackWords += int(line[2])
 
     if(args.sort_stack):
         lines.sort(reverse=True, key=itemgetter(2))
@@ -32,13 +30,14 @@ def stack_profile(tsv):
     outfile = open(args.outfile, 'w')
     outfile.write("Total: " + locale.format("%d", totalWords, grouping=True) +
                   " words\n")
-    outfile.write("Instr\tCurrent\tCur %\tStack %\tLocation\n")
-    outfile.write("-----\t-------\t-----\t-------\t--------\n")
+    outfile.write("Instr\tCurrent\tCur %\tStack\tStack %\tLocation\n")
+    outfile.write("-----\t-------\t-----\t-----\t-------\t--------\n")
     for line in lines:
         outfile.write("%d" % line[0] + "\t" + "%d" % line[1] + "\t" +
                       "%.2f" % (float(line[1]) * 100.0 / totalWords) + "%\t" +
-                      "%.2f" % (float(line[2]) * 100.0 / totalStackWords) +
-                      "%\t" + "%s" % line[3] + "\n")
+                      "%d" % line[2] + "\t" +
+                      "%.2f" % (float(line[2]) * 100.0 / totalWords) + "%\t" +
+                      "%s" % line[3] + "\n")
     outfile.close()
 
 

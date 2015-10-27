@@ -78,8 +78,7 @@ extern value* caml_extern_sp;
   if (caml_profile_counts && profile_pc) {                                  \
     caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;    \
     if (caml_profile_stack_depth) {                                         \
-      caml_update_stack_profile (caml_profile_stack_depth, wosize,          \
-                                 caml_profile_stack_counts);                \
+      caml_update_stack_profile (wosize);                                   \
     }                                                                       \
   }                                                                         \
   caml_young_ptr -= Bhsize_wosize (wosize);                                 \

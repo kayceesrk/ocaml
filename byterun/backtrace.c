@@ -43,6 +43,9 @@ CAMLexport code_t * caml_backtrace_buffer = NULL;
 CAMLexport value caml_backtrace_last_exn = Val_unit;
 CAMLexport char * caml_cds_file = NULL;
 #define BACKTRACE_BUFFER_SIZE 1024
+extern code_t *caml_profile_stack_info;
+extern unsigned int *caml_profile_stack_counts;
+extern long caml_profile_stack_depth;
 
 /* Location of fields in the Instruct.debug_event record */
 enum { EV_POS = 0,
@@ -196,19 +199,32 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
   CAMLreturn(trace);
 }
 
-void caml_update_stack_profile (long max_frames, mlsize_t wosize,
-                                unsigned int* caml_profile_stack_counts)
+static int unseen_frame_pointer (int next_idx, code_t p) {
+  int i;
+  for (i = next_idx - 1; i >= 0; i--) {
+    if (caml_profile_stack_info[i] == p)
+      return 0;
+  }
+  return 1;
+}
+
+void caml_update_stack_profile (mlsize_t wosize)
 {
   value* sp = caml_extern_sp;
   value* trsp = caml_trapsp;
   long i;
+  int next_idx = 0;
 
-  for (i = 0; i < max_frames; i++) {
+  for (i = 0; i < caml_profile_stack_depth; i++) {
     code_t p = caml_next_frame_pointer (&sp, &trsp);
     if (p == NULL) {
       return;
     }
-    caml_profile_stack_counts[p - caml_start_code] += wosize;
+    /* Count only once for recursive calls. */
+    if (unseen_frame_pointer (next_idx, p)) {
+      caml_profile_stack_counts[p - caml_start_code] += wosize;
+      caml_profile_stack_info[next_idx++] = p;
+    }
   }
 }
 
