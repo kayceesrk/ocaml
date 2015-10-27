@@ -320,9 +320,17 @@ static void read_debug_info(void)
   CAMLreturn0;
 }
 
+char* read_debug_info_with_error (void)
+{
+  read_debug_info ();
+  if (events != NULL)
+    return NULL;
+  return read_debug_info_error;
+}
+
 /* Search the event index for the given PC.  Return -1 if not found. */
 
-static intnat event_for_location(code_t pc)
+static intnat event_for_location(code_t pc, int get_containing)
 {
   uintnat low = 0, high = n_events;
   Assert(pc >= caml_start_code && pc < caml_start_code + caml_code_size);
@@ -340,24 +348,18 @@ static intnat event_for_location(code_t pc)
     return low;
   if(low+1 < n_events && events[low+1].ev_pc == pc + 1)
     return low+1;
+  if(get_containing) {
+    return low;
+  }
   return -1;
 }
 
 /* Extract location information for the given PC */
 
-struct loc_info {
-  int loc_valid;
-  int loc_is_raise;
-  char * loc_filename;
-  int loc_lnum;
-  int loc_startchr;
-  int loc_endchr;
-};
-
-static void extract_location_info(code_t pc,
-                                  /*out*/ struct loc_info * li)
+void extract_location_info(code_t pc, int get_containing,
+                           /*out*/ struct loc_info * li)
 {
-  intnat ev = event_for_location(pc);
+  intnat ev = event_for_location(pc, get_containing);
   li->loc_is_raise = caml_is_instruction(*pc, RAISE) ||
     caml_is_instruction(*pc, RERAISE);
   if (ev == -1) {
@@ -415,7 +417,7 @@ CAMLexport void caml_print_exception_backtrace(void)
     return;
   }
   for (i = 0; i < caml_backtrace_pos; i++) {
-    extract_location_info(caml_backtrace_buffer[i], &li);
+    extract_location_info(caml_backtrace_buffer[i], 0, &li);
     print_location(&li, i);
   }
 }
@@ -431,7 +433,7 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
   if (events == NULL)
     caml_failwith(read_debug_info_error);
 
-  extract_location_info(Codet_Val(backtrace_slot), &li);
+  extract_location_info(Codet_Val(backtrace_slot), 0, &li);
 
   if (li.loc_valid) {
     fname = caml_copy_string(li.loc_filename);

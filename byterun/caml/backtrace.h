@@ -28,4 +28,17 @@ extern void caml_stash_backtrace(value exn, code_t pc, value * sp, int reraise);
 #endif
 CAMLextern void caml_print_exception_backtrace(void);
 
+struct loc_info {
+  int loc_valid;
+  int loc_is_raise;
+  char * loc_filename;
+  int loc_lnum;
+  int loc_startchr;
+  int loc_endchr;
+};
+
+void extract_location_info(code_t pc, int get_containing,
+                           /*out*/ struct loc_info * li);
+char* read_debug_info_with_error (void);
+
 #endif /* CAML_BACKTRACE_H */

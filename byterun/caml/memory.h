@@ -71,8 +71,9 @@ extern code_t caml_start_code;
 #define Alloc_small(result, wosize, tag) do{    CAMLassert ((wosize) >= 1); \
                                           CAMLassert ((tag_t) (tag) < 256); \
                                  CAMLassert ((wosize) <= Max_young_wosize); \
-  if (caml_profile_counts && profile_pc)                                    \
+  if (caml_profile_counts && profile_pc) {                                  \
     caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;    \
+  }                                                                         \
   caml_young_ptr -= Bhsize_wosize (wosize);                                 \
   if (caml_young_ptr < caml_young_start){                                   \
     caml_young_ptr += Bhsize_wosize (wosize);                               \

@@ -342,6 +342,38 @@ extern void caml_install_invalid_parameter_handler();
 
 #endif
 
+CAMLprim value caml_output_profile (value unit) {
+  CAMLparam1 (unit);
+  if (prof_file != NULL) {
+    int i;
+    FILE* fp = fopen (prof_file, "w");
+    struct loc_info li = {0};
+    char* err = NULL;
+
+    err = read_debug_info_with_error ();
+    if (err != NULL) {
+      fprintf(stderr, "(Cannot output profile: %s)\n", err);
+      CAMLreturn (Val_unit);
+    }
+    for (i = 0; i < caml_code_size; i++) {
+      if (caml_profile_counts[i] != 0) {
+        extract_location_info (caml_start_code + i, 1, &li);
+        if (li.loc_valid) {
+          fprintf (fp, "%d\t%u\tfile \"%s\", line %d, characters %d-%d\n",
+                   i, caml_profile_counts[i], li.loc_filename, li.loc_lnum,
+                   li.loc_startchr, li.loc_endchr);
+        }
+        else {
+          fprintf (fp, "%d\t%u\n", i,caml_profile_counts[i]);
+        }
+      }
+    }
+    fflush(fp);
+    fclose(fp);
+  }
+  CAMLreturn (Val_unit);
+}
+
 /* Main entry point when loading code from a file */
 
 CAMLexport void caml_main(char **argv)
@@ -450,16 +482,7 @@ CAMLexport void caml_main(char **argv)
   caml_debugger(PROGRAM_START);
   res = caml_interprete(caml_start_code, caml_code_size);
   /* Output profile */
-  if (prof_file != NULL) {
-    int i;
-    FILE* fp = fopen (prof_file, "w");
-    for (i = 0; i < caml_code_size; i++) {
-      if (caml_profile_counts[i] != 0)
-        fprintf (fp, "%d\t%u\n", i,caml_profile_counts[i]);
-    }
-    fflush(fp);
-    fclose(fp);
-  }
+  caml_output_profile (Val_unit);
   if (Is_exception_result(res)) {
     caml_exn_bucket = Extract_exception(res);
     if (caml_debugger_in_use) {
@@ -549,18 +572,4 @@ CAMLexport void caml_startup_code(
   }
 }
 
-CAMLprim value caml_output_profile (value unit) {
-  CAMLparam1 (unit);
-  fprintf (stderr, "prof_file=%p\n",prof_file);
-  if (prof_file != NULL) {
-    int i;
-    FILE* fp = fopen (prof_file, "w");
-    for (i = 0; i < caml_code_size; i++) {
-      if (caml_profile_counts[i] != 0)
-        fprintf (fp, "%d\t%u\n", i,caml_profile_counts[i]);
-    }
-    fflush(fp);
-    fclose(fp);
-  }
-  CAMLreturn (Val_unit);
-}
+

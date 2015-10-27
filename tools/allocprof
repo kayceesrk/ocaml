@@ -12,7 +12,7 @@ with open(sys.argv[1]) as tsv:
     lines = []
     totalWords = 0
     for line in csv.reader(tsv, dialect="excel-tab"):
-        lines.append([int(line[0]), int(line[1])])
+        lines.append([int(line[0]), int(line[1]), line[2]])
         totalWords += int(line[1])
 
     lines.sort(reverse=True, key=itemgetter(1))
@@ -20,8 +20,9 @@ with open(sys.argv[1]) as tsv:
     # Print output
     locale.setlocale(locale.LC_ALL, 'en_US')
     print "Total: " + locale.format("%d", totalWords, grouping=True) + " words"
-    print "Instr\tWords\t% of total"
-    print "-----\t-----\t----------"
+    print "Instr\tWords\t% of total\tLocation"
+    print "-----\t-----\t----------\t--------"
     for line in lines:
         print ("%d" % line[0] + "\t" + "%d" % line[1] + "\t" +
-               "%.2f" % (float(line[1]) * 100.0 / totalWords) + "%")
+               "%.2f" % (float(line[1]) * 100.0 / totalWords) + "%\t" +
+               "%s" % line[2])
