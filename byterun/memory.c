@@ -28,6 +28,7 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/signals.h"
+#include "caml/backtrace.h"
 
 int caml_huge_fallback_count = 0;
 /* Number of times that mmapping big pages fails and we fell back to small
@@ -463,6 +464,15 @@ static inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag,
 {
   header_t *hp;
   value *new_block;
+
+#ifndef NATIVE_CODE
+  if (caml_profile_counts && profile_pc) {
+    caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;
+    if (caml_profile_stack_depth) {
+      caml_update_stack_profile (wosize);
+    }
+  }
+#endif
 
   if (wosize > Max_wosize) {
     if (raise_oom)

@@ -45,6 +45,9 @@
 struct ext_table caml_debug_info;
 
 CAMLexport char * caml_cds_file = NULL;
+CAMLextern code_t *caml_profile_stack_info;
+CAMLextern unsigned int *caml_profile_stack_counts;
+CAMLextern long caml_profile_stack_depth;
 
 /* Location of fields in the Instruct.debug_event record */
 enum {
@@ -330,6 +333,35 @@ CAMLprim value caml_get_current_callstack(value max_frames_value)
   CAMLreturn(trace);
 }
 
+static int unseen_frame_pointer (int next_idx, code_t p) {
+  int i;
+  for (i = next_idx - 1; i >= 0; i--) {
+    if (caml_profile_stack_info[i] == p)
+      return 0;
+  }
+  return 1;
+}
+
+void caml_update_stack_profile (mlsize_t wosize)
+{
+  value* sp = caml_extern_sp;
+  value* trsp = caml_trapsp;
+  long i;
+  int next_idx = 0;
+
+  for (i = 0; i < caml_profile_stack_depth; i++) {
+    code_t p = caml_next_frame_pointer (&sp, &trsp);
+    if (p == NULL) {
+      return;
+    }
+    /* Count only once for recursive calls. */
+    if (unseen_frame_pointer (next_idx, p)) {
+      caml_profile_stack_counts[p - caml_start_code] += wosize;
+      caml_profile_stack_info[next_idx++] = p;
+    }
+  }
+}
+
 /* Read the debugging info contained in the current bytecode executable. */
 
 #ifndef O_BINARY
@@ -401,7 +433,7 @@ int caml_debug_info_available(void)
 
 /* Search the event index for the given PC.  Return -1 if not found. */
 
-static struct ev_info *event_for_location(code_t pc)
+static struct ev_info *event_for_location(code_t pc, int get_containing)
 {
   uintnat low, high;
   struct debug_info *di = find_debug_info(pc);
@@ -430,17 +462,17 @@ static struct ev_info *event_for_location(code_t pc)
     return &di->events[low];
   if (low+1 < di->num_events && di->events[low+1].ev_pc == pc + 1)
     return &di->events[low+1];
+  if(get_containing)
+    return &di->events[low];
 
   return NULL;
 }
 
-/* Extract location information for the given PC */
-
-void caml_extract_location_info(backtrace_slot slot,
-                                /*out*/ struct caml_loc_info * li)
+void caml_extract_containing_location_info(backtrace_slot slot, int get_containing,
+                                     /*out*/ struct caml_loc_info * li)
 {
   code_t pc = slot;
-  struct ev_info *event = event_for_location(pc);
+  struct ev_info *event = event_for_location(pc, get_containing);
   li->loc_is_raise =
     caml_is_instruction(*pc, RAISE) ||
     caml_is_instruction(*pc, RERAISE);
@@ -453,4 +485,10 @@ void caml_extract_location_info(backtrace_slot slot,
   li->loc_lnum = event->ev_lnum;
   li->loc_startchr = event->ev_startchr;
   li->loc_endchr = event->ev_endchr;
+}
+
+/* Extract location information for the given PC */
+
+void caml_extract_location_info (backtrace_slot slot, /*out*/ struct caml_loc_info * li) {
+  caml_extract_containing_location_info (slot, 0, li);
 }

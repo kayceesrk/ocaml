@@ -29,6 +29,7 @@
 /* </private> */
 #include "misc.h"
 #include "mlvalues.h"
+#include "stdio.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,6 +47,7 @@ CAMLextern value caml_check_urgent_gc (value);
 CAMLextern void * caml_stat_alloc (asize_t);              /* Size in bytes. */
 CAMLextern void caml_stat_free (void *);
 CAMLextern void * caml_stat_resize (void *, asize_t);     /* Size in bytes. */
+CAMLextern void caml_update_stack_profile (mlsize_t);
 CAMLextern int caml_init_alloc_for_heap (void);
 CAMLextern char *caml_alloc_for_heap (asize_t request);   /* Size in bytes. */
 CAMLextern void caml_free_for_heap (char *mem);
@@ -83,9 +85,30 @@ int caml_page_table_initialize(mlsize_t bytesize);
 #define DEBUG_clear(result, wosize)
 #endif
 
+extern unsigned int* caml_profile_counts;
+extern unsigned int* caml_profile_stack_counts;
+extern long caml_profile_stack_depth;
+extern code_t profile_pc;
+extern code_t caml_start_code;
+extern value* caml_extern_sp;
+
+#ifndef NATIVE_CODE
+#define Profile_alloc(wosize) do {                                          \
+  if (caml_profile_counts && profile_pc) {                                  \
+    caml_profile_counts[(long)(profile_pc - caml_start_code)] += wosize;    \
+    if (caml_profile_stack_depth) {                                         \
+      caml_update_stack_profile (wosize);                                   \
+    }                                                                       \
+  }                                                                         \
+} while(0)
+#else
+#define Profile_alloc(wosize)
+#endif
+
 #define Alloc_small(result, wosize, tag) do{    CAMLassert ((wosize) >= 1); \
                                           CAMLassert ((tag_t) (tag) < 256); \
                                  CAMLassert ((wosize) <= Max_young_wosize); \
+  Profile_alloc(wosize);                                                    \
   caml_young_ptr -= Whsize_wosize (wosize);                                 \
   if (caml_young_ptr < caml_young_trigger){                                 \
     caml_young_ptr += Whsize_wosize (wosize);                               \

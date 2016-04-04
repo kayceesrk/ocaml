@@ -333,6 +333,9 @@ void caml_empty_minor_heap (void)
   uintnat prev_alloc_words;
   struct caml_ephe_ref_elt *re;
 
+#ifndef NATIVE_CODE
+  profile_pc = NULL;
+#endif
   if (caml_young_ptr != caml_young_alloc_end){
     if (caml_minor_gc_begin_hook != NULL) (*caml_minor_gc_begin_hook) ();
     CAML_INSTR_SETUP (tmr, "minor");

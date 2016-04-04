@@ -46,6 +46,10 @@ int caml_debug_info_available(void);
 void caml_extract_location_info(backtrace_slot pc,
                                 /*out*/ struct caml_loc_info * li);
 
+void caml_extract_containing_location_info(backtrace_slot pc, int get_containing,
+                                /*out*/ struct caml_loc_info * li);
+void caml_update_stack_profile (mlsize_t wosize);
+
 /* Expose a [backtrace_slot] as a OCaml value of type [raw_backtrace_slot].
  * The value returned should be an immediate and not an OCaml block, so that it
  * is safe to store using direct assignment and [Field], and not [Store_field] /
