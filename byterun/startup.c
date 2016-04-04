@@ -19,8 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <errno.h>
-#include <limits.h>
 #include "caml/config.h"
 #ifdef HAS_UNISTD
 #include <unistd.h>
@@ -51,6 +49,7 @@
 #include "caml/osdeps.h"
 #include "caml/prims.h"
 #include "caml/printexc.h"
+#include "caml/profiling.h"
 #include "caml/reverse.h"
 #include "caml/signals.h"
 #include "caml/stacks.h"
@@ -66,12 +65,6 @@
 #ifndef SEEK_END
 #define SEEK_END 2
 #endif
-
-unsigned int *caml_profile_counts = NULL;
-unsigned int *caml_profile_stack_counts = NULL;
-long caml_profile_stack_depth = 0;
-code_t *caml_profile_stack_info = NULL;
-char* prof_file = NULL;
 
 /* Read the trailer of a bytecode file */
 
@@ -272,108 +265,6 @@ extern void caml_signal_thread(void * lpParam);
 
 /* PR 4887: avoid crash box of windows runtime on some system calls */
 extern void caml_install_invalid_parameter_handler();
-
-#endif
-
-#ifndef NATIVE_CODE
-
-CAMLprim value caml_output_profile (value unit) {
-  CAMLparam1 (unit);
-  if (prof_file != NULL) {
-    int i;
-    FILE* fp = fopen (prof_file, "w");
-    struct caml_loc_info li = {0};
-
-    if (!caml_debug_info_available()) {
-      fprintf(stderr, "(Cannot output profile: Debug information not available)\n");
-      CAMLreturn (Val_unit);
-    }
-
-    /* Write out the profile */
-    if (caml_profile_stack_depth)
-      fprintf (fp, "__STACK__\n");
-    else
-      fprintf (fp, "__FLAT__\n");
-
-    for (i = 0; i < caml_code_size; i++) {
-      if (caml_profile_counts[i] != 0 ||
-          (caml_profile_stack_counts &&
-           caml_profile_stack_counts[i] != 0)) {
-        caml_extract_containing_location_info (caml_start_code + i, 1, &li);
-        if (li.loc_valid) {
-          if (caml_profile_stack_depth) {
-            fprintf (fp, "%d\t%u\t%u\tfile \"%s\", line %d, characters %d-%d\n",
-                    i, caml_profile_counts[i], caml_profile_stack_counts[i],
-                    li.loc_filename, li.loc_lnum, li.loc_startchr, li.loc_endchr);
-          } else {
-            fprintf (fp, "%d\t%u\tfile \"%s\", line %d, characters %d-%d\n",
-                    i, caml_profile_counts[i], li.loc_filename, li.loc_lnum,
-                    li.loc_startchr, li.loc_endchr);
-          }
-        }
-        else {
-          if (caml_profile_stack_depth) {
-            fprintf (fp, "%d\t%u\t%u\n", i, caml_profile_counts[i],
-                     caml_profile_stack_counts[i]);
-          } else {
-            fprintf (fp, "%d\t%u\n", i,caml_profile_counts[i]);
-          }
-        }
-      }
-    }
-    fflush(fp);
-    fclose(fp);
-  }
-  CAMLreturn (Val_unit);
-}
-
-/* Initialize the profiler */
-static void caml_init_profiler () {
-  prof_file = getenv("CAML_PROFILE_ALLOC");
-  if (prof_file != NULL) {
-    int i, base = 10;
-    char *endptr, *str;
-    errno = 0;
-    str = getenv("CAML_PROFILE_STACK");
-    if (str != NULL) {
-      caml_profile_stack_depth = strtol(str, &endptr, base);
-
-      /* Check for various possible errors */
-      if ((errno == ERANGE && (caml_profile_stack_depth == LONG_MAX
-                              || caml_profile_stack_depth == LONG_MIN))
-          || (errno != 0 && caml_profile_stack_depth == 0)) {
-        fprintf (stderr, "Error processing CAML_PROFILE_STACK\n");
-        perror("strtol");
-        exit(EXIT_FAILURE);
-      }
-
-      if (endptr == str) {
-        fprintf(stderr, "CAML_PROFILE_STACK: No digits were found\n");
-        exit(EXIT_FAILURE);
-      }
-
-      if (caml_profile_stack_depth < 1) {
-        fprintf(stderr, "CAML_PROFILE_STACK: depth must be greater than 0\n");
-        exit(EXIT_FAILURE);
-      }
-      /* Successfully parsed stack depth */
-    }
-
-    caml_profile_counts =
-      (unsigned int *) caml_stat_alloc (caml_code_size * sizeof(unsigned int));
-    if (caml_profile_stack_depth) {
-      caml_profile_stack_counts =
-        (unsigned int *) caml_stat_alloc (caml_code_size * sizeof(unsigned int));
-      caml_profile_stack_info =
-        (code_t*) caml_stat_alloc (caml_profile_stack_depth * sizeof(code_t));
-    }
-    for (i = 0; i < caml_code_size; i++) {
-      caml_profile_counts[i] = 0;
-      if (caml_profile_stack_depth)
-        caml_profile_stack_counts[i] = 0;
-    }
-  }
-}
 
 #endif
 

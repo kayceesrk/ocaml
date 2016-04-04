@@ -27,8 +27,8 @@
 #include "caml/minor_gc.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
+#include "caml/profiling.h"
 #include "caml/signals.h"
-#include "caml/backtrace.h"
 
 int caml_huge_fallback_count = 0;
 /* Number of times that mmapping big pages fails and we fell back to small

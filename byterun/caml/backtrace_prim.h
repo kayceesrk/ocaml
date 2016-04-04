@@ -45,10 +45,8 @@ int caml_debug_info_available(void);
 /* Extract locations from backtrace_slot */
 void caml_extract_location_info(backtrace_slot pc,
                                 /*out*/ struct caml_loc_info * li);
-
 void caml_extract_containing_location_info(backtrace_slot pc, int get_containing,
                                 /*out*/ struct caml_loc_info * li);
-void caml_update_stack_profile (mlsize_t wosize);
 
 /* Expose a [backtrace_slot] as a OCaml value of type [raw_backtrace_slot].
  * The value returned should be an immediate and not an OCaml block, so that it
@@ -56,6 +54,11 @@ void caml_update_stack_profile (mlsize_t wosize);
  * [caml_modify].  */
 value caml_val_raw_backtrace_slot(backtrace_slot pc);
 backtrace_slot caml_raw_backtrace_slot_val(value slot);
+
+/* Returns the next frame pointer (or NULL if none is available);
+   updates *sp to point to the following one, and *trsp to the next trap frame,
+   which we will skip when we reach it  */
+code_t caml_next_frame_pointer(value**,value**);
 
 #define BACKTRACE_BUFFER_SIZE 1024
 

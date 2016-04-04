@@ -45,9 +45,6 @@
 struct ext_table caml_debug_info;
 
 CAMLexport char * caml_cds_file = NULL;
-CAMLextern code_t *caml_profile_stack_info;
-CAMLextern unsigned int *caml_profile_stack_counts;
-CAMLextern long caml_profile_stack_depth;
 
 /* Location of fields in the Instruct.debug_event record */
 enum {
@@ -333,34 +330,6 @@ CAMLprim value caml_get_current_callstack(value max_frames_value)
   CAMLreturn(trace);
 }
 
-static int unseen_frame_pointer (int next_idx, code_t p) {
-  int i;
-  for (i = next_idx - 1; i >= 0; i--) {
-    if (caml_profile_stack_info[i] == p)
-      return 0;
-  }
-  return 1;
-}
-
-void caml_update_stack_profile (mlsize_t wosize)
-{
-  value* sp = caml_extern_sp;
-  value* trsp = caml_trapsp;
-  long i;
-  int next_idx = 0;
-
-  for (i = 0; i < caml_profile_stack_depth; i++) {
-    code_t p = caml_next_frame_pointer (&sp, &trsp);
-    if (p == NULL) {
-      return;
-    }
-    /* Count only once for recursive calls. */
-    if (unseen_frame_pointer (next_idx, p)) {
-      caml_profile_stack_counts[p - caml_start_code] += wosize;
-      caml_profile_stack_info[next_idx++] = p;
-    }
-  }
-}
 
 /* Read the debugging info contained in the current bytecode executable. */
 
