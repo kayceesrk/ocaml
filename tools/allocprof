@@ -1,0 +1,71 @@
+#!/usr/bin/env python
+
+import csv
+from operator import itemgetter
+import locale
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('infile', help="input file")
+parser.add_argument('outfile', help="output file")
+parser.add_argument('--sort-stack', help="sort based on stack",
+                    action="store_true")
+args = parser.parse_args()
+
+
+def stack_profile(tsv):
+    lines = []
+    totalWords = 0
+    for line in csv.reader(tsv, dialect="excel-tab"):
+        lines.append([int(line[0]), int(line[1]), int(line[2]), line[3]])
+        totalWords += int(line[1])
+
+    if(args.sort_stack):
+        lines.sort(reverse=True, key=itemgetter(2))
+    else:
+        lines.sort(reverse=True, key=itemgetter(1))
+
+    # Print output
+    locale.setlocale(locale.LC_ALL, 'en_US')
+    outfile = open(args.outfile, 'w')
+    outfile.write("Total: " + locale.format("%d", totalWords, grouping=True) +
+                  " words\n")
+    outfile.write("Instr\tCurrent\tCur %\tStack\tStack %\tLocation\n")
+    outfile.write("-----\t-------\t-----\t-----\t-------\t--------\n")
+    for line in lines:
+        outfile.write("%d" % line[0] + "\t" + "%d" % line[1] + "\t" +
+                      "%.2f" % (float(line[1]) * 100.0 / totalWords) + "%\t" +
+                      "%d" % line[2] + "\t" +
+                      "%.2f" % (float(line[2]) * 100.0 / totalWords) + "%\t" +
+                      "%s" % line[3] + "\n")
+    outfile.close()
+
+
+def flat_profile(tsv):
+    lines = []
+    totalWords = 0
+    for line in csv.reader(tsv, dialect="excel-tab"):
+        lines.append([int(line[0]), int(line[1]), line[2]])
+        totalWords += int(line[1])
+
+    lines.sort(reverse=True, key=itemgetter(1))
+
+    # Print output
+    locale.setlocale(locale.LC_ALL, 'en_US')
+    outfile = open(args.outfile, 'w')
+    outfile.write("Total: " + locale.format("%d", totalWords, grouping=True) +
+                  " words\n")
+    outfile.write("Instr\tWords\t% of total\tLocation\n")
+    outfile.write("-----\t-----\t----------\t--------\n")
+    for line in lines:
+        outfile.write("%d" % line[0] + "\t" + "%d" % line[1] + "\t" +
+                      "%.2f" % (float(line[1]) * 100.0 / totalWords) + "%\t" +
+                      "%s" % line[2] + "\n")
+    outfile.close()
+
+with open(args.infile) as tsv:
+    s = tsv.readline()
+    if (s == "__FLAT__\n"):
+        flat_profile(tsv)
+    else:
+        stack_profile(tsv)
