@@ -68,6 +68,7 @@ type operation =
   | Iintop_imm of integer_operation * int
   | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf
   | Ifloatofint | Iintoffloat
+  | Iprefetch
   | Ispecific of Arch.specific_operation
 
 type instruction =

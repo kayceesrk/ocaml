@@ -123,6 +123,7 @@ and operation =
   | Ccmpf of comparison
   | Craise of raise_kind
   | Ccheckbound
+  | Cprefetch
 
 (** Not all cmm expressions currently have [Debuginfo.t] values attached to
     them.  The ones that do are those that are likely to generate code that

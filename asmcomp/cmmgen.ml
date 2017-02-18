@@ -1900,6 +1900,8 @@ and transl_prim_1 env p arg dbg =
   (* Heap operations *)
   | Pfield n ->
       get_field (transl env arg) n dbg
+  | Pprefetch ->
+      return_unit @@ Cop(Cprefetch, [transl env arg], dbg)
   | Pfloatfield n ->
       let ptr = transl env arg in
       box_float dbg (

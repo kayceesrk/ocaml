@@ -182,6 +182,7 @@ module I = struct
   let nop () = emit NOP
   let or_ x y = emit (OR (x, y))
   let pop x = emit (POP x)
+  let prefetch x = emit (PREFETCH x)
   let push x = emit (PUSH x)
   let ret () = emit RET
   let sal x y = emit (SAL (x, y))

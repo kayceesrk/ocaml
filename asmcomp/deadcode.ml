@@ -38,6 +38,7 @@ let rec deadcode i =
       && not (Proc.regs_are_volatile arg)      (* no stack-like hard reg *)
       && not (Proc.regs_are_volatile i.res)    (*            is involved *)
       then begin
+        if (Array.length i.res <= 0 && op = Iprefetch) then print_endline "prefetch";
         assert (Array.length i.res > 0);  (* sanity check *)
         (s, before)
       end else begin

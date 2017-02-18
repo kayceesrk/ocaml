@@ -323,7 +323,7 @@ let op_is_pure = function
   | Iextcall _ | Istackoffset _ | Istore _ | Ialloc _
   | Iintop(Icheckbound _) | Iintop_imm(Icheckbound _, _) -> false
   | Ispecific(Ilea _) -> true
-  | Ispecific _ -> false
+  | Ispecific _ | Iprefetch -> false
   | _ -> true
 
 (* Layout of the stack frame *)

@@ -569,6 +569,8 @@ let emit_instr fallthrough i =
       if n <> 0
       then cfi_adjust_cfa_offset n;
       stack_offset := !stack_offset + n
+  | Lop(Iprefetch) ->
+      I.prefetch (mem64 QWORD 0 (arg64 i 0))
   | Lop(Iload(chunk, addr)) ->
       let dest = res i 0 in
       begin match chunk with

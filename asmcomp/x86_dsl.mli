@@ -175,6 +175,7 @@ module I : sig
   val nop: unit -> unit
   val or_: arg -> arg -> unit
   val pop: arg -> unit
+  val prefetch: arg -> unit
   val push: arg -> unit
   val ret: unit -> unit
   val sal: arg -> arg -> unit

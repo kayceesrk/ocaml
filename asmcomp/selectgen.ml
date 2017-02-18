@@ -68,6 +68,7 @@ let oper_result_type = function
   | Cintoffloat -> typ_int
   | Craise _ -> typ_void
   | Ccheckbound -> typ_void
+  | Cprefetch -> typ_void
 
 (* Infer the size in bytes of the result of a simple expression *)
 
@@ -344,6 +345,7 @@ method select_operation op args _dbg =
     let extra_args = self#select_checkbound_extra_args () in
     let op = self#select_checkbound () in
     self#select_arith op (args @ extra_args)
+  | (Cprefetch, _) -> (Iprefetch, args)
   | _ -> fatal_error "Selection.select_oper"
 
 method private select_arith_comm op = function

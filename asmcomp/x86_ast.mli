@@ -168,6 +168,7 @@ type instruction =
   | NOP
   | OR of arg * arg
   | POP of arg
+  | PREFETCH of arg
   | PUSH of arg
   | RET
   | ROUNDSD of rounding * arg * arg

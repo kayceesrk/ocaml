@@ -151,6 +151,7 @@ and operation =
   | Ccmpf of comparison
   | Craise of raise_kind
   | Ccheckbound
+  | Cprefetch
 
 type expression =
     Cconst_int of int

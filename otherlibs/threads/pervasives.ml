@@ -634,3 +634,8 @@ let exit retcode =
   sys_exit retcode
 
 let _ = register_named_value "Pervasives.do_at_exit" do_at_exit
+
+external prefetch : 'a -> unit = "%prefetch"
+external is_int : 'a -> bool = "%obj_is_int"
+
+let prefetch v = if not (is_int v) then prefetch v

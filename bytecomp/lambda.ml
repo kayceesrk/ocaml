@@ -149,6 +149,7 @@ type primitive =
   | Pint_as_pointer
   (* Inhibition of optimisation *)
   | Popaque
+  | Pprefetch
 
 and comparison =
     Ceq | Cneq | Clt | Cgt | Cle | Cge
