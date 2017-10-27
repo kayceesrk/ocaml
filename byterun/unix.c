@@ -54,6 +54,7 @@
 #include "caml/signals.h"
 #include "caml/sys.h"
 #include "caml/io.h"
+#include "caml/alloc.h"
 
 #ifndef S_ISREG
 #define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
@@ -131,9 +132,10 @@ caml_stat_string caml_decompose_path(struct ext_table * tbl, char * path)
   return p;
 }
 
-caml_stat_string caml_search_in_path(struct ext_table * path, char * name)
+caml_stat_string caml_search_in_path(struct ext_table * path, const char * name)
 {
-  char * p, * dir, * fullname;
+  const char * p;
+  char * dir, * fullname;
   int i;
   struct stat st;
 
@@ -157,19 +159,22 @@ caml_stat_string caml_search_in_path(struct ext_table * path, char * name)
 /* Cygwin needs special treatment because of the implicit ".exe" at the
    end of executable file names */
 
-static int cygwin_file_exists(char * name)
+static int cygwin_file_exists(const char * name)
 {
-  int fd;
+  int fd, ret;
+  struct stat st;
   /* Cannot use stat() here because it adds ".exe" implicitly */
   fd = open(name, O_RDONLY);
   if (fd == -1) return 0;
+  ret = fstat(fd, &st);
   close(fd);
-  return 1;
+  return ret == 0 && S_ISREG(st.st_mode);
 }
 
-static caml_stat_string cygwin_search_exe_in_path(struct ext_table * path, char * name)
+static caml_stat_string cygwin_search_exe_in_path(struct ext_table * path, const char * name)
 {
-  char * p, * dir, * fullname;
+  const char * p;
+  char * dir, * fullname;
   int i;
 
   for (p = name; *p != 0; p++) {
@@ -195,7 +200,7 @@ static caml_stat_string cygwin_search_exe_in_path(struct ext_table * path, char 
 
 #endif
 
-caml_stat_string caml_search_exe_in_path(char * name)
+caml_stat_string caml_search_exe_in_path(const char * name)
 {
   struct ext_table path;
   char * tofree;
@@ -213,7 +218,7 @@ caml_stat_string caml_search_exe_in_path(char * name)
   return res;
 }
 
-caml_stat_string caml_search_dll_in_path(struct ext_table * path, char * name)
+caml_stat_string caml_search_dll_in_path(struct ext_table * path, const char * name)
 {
   caml_stat_string dllname;
   caml_stat_string res;
@@ -240,12 +245,12 @@ void caml_dlclose(void * handle)
   flexdll_dlclose(handle);
 }
 
-void * caml_dlsym(void * handle, char * name)
+void * caml_dlsym(void * handle, const char * name)
 {
   return flexdll_dlsym(handle, name);
 }
 
-void * caml_globalsym(char * name)
+void * caml_globalsym(const char * name)
 {
   return flexdll_dlsym(flexdll_dlopen(NULL,0), name);
 }
@@ -276,7 +281,7 @@ void caml_dlclose(void * handle)
   dlclose(handle);
 }
 
-void * caml_dlsym(void * handle, char * name)
+void * caml_dlsym(void * handle, const char * name)
 {
 #ifdef DL_NEEDS_UNDERSCORE
   char _name[1000] = "_";
@@ -286,7 +291,7 @@ void * caml_dlsym(void * handle, char * name)
   return dlsym(handle, name);
 }
 
-void * caml_globalsym(char * name)
+void * caml_globalsym(const char * name)
 {
 #ifdef RTLD_DEFAULT
   return caml_dlsym(RTLD_DEFAULT, name);
@@ -312,12 +317,12 @@ void caml_dlclose(void * handle)
 {
 }
 
-void * caml_dlsym(void * handle, char * name)
+void * caml_dlsym(void * handle, const char * name)
 {
   return NULL;
 }
 
-void * caml_globalsym(char * name)
+void * caml_globalsym(const char * name)
 {
   return NULL;
 }
@@ -367,15 +372,16 @@ char * caml_executable_name(void)
      to determine the size of the buffer.  Instead, we guess and adjust. */
   namelen = 256;
   while (1) {
-    name = caml_stat_alloc(namelen + 1);
+    name = caml_stat_alloc(namelen);
     retcode = readlink("/proc/self/exe", name, namelen);
     if (retcode == -1) { caml_stat_free(name); return NULL; }
-    if (retcode <= namelen) break;
+    if (retcode < namelen) break;
     caml_stat_free(name);
     if (namelen >= 1024*1024) return NULL; /* avoid runaway and overflow */
     namelen *= 2;
   }
-  /* readlink() does not zero-terminate its result */
+  /* readlink() does not zero-terminate its result.
+     There is room for a final zero since retcode < namelen. */
   name[retcode] = 0;
   /* Make sure that the contents of /proc/self/exe is a regular file.
      (Old Linux kernels return an inode number instead.) */
@@ -397,7 +403,7 @@ char * caml_executable_name(void)
   if (_NSGetExecutablePath(name, &namelen) == 0) return name;
   caml_stat_free(name);
   return NULL;
-    
+
 #else
   return NULL;
 

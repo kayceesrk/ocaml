@@ -28,6 +28,7 @@ module Storer =
       type t = lambda
       type key = lambda
       let make_key =  Lambda.make_key
+      let compare_key = Pervasives.compare
     end)
 
 (* Auxiliaries for compiling functions *)
@@ -1259,13 +1260,13 @@ and close_switch fenv cenv cases num_keys default =
   (* First default case *)
   begin match default with
   | Some def when ncases < num_keys ->
-      assert (store.act_store def = 0)
+      assert (store.act_store () def = 0)
   | _ -> ()
   end ;
   (* Then all other cases *)
   List.iter
     (fun (key,lam) ->
-     index.(key) <- store.act_store lam)
+     index.(key) <- store.act_store () lam)
     cases ;
 
   (*  Explicit sharing with catch/exit, as switcher compilation may

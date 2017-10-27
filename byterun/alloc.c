@@ -110,6 +110,14 @@ CAMLexport value caml_alloc_string (mlsize_t len)
   return result;
 }
 
+/* [len] is a number of bytes (chars) */
+CAMLexport value caml_alloc_initialized_string (mlsize_t len, const char *p)
+{
+  value result = caml_alloc_string (len);
+  memcpy((char *)String_val(result), p, len);
+  return result;
+}
+
 /* [len] is a number of words.
    [mem] and [max] are relative (without unit).
 */
@@ -126,8 +134,7 @@ CAMLexport value caml_copy_string(char const *s)
   value res;
 
   len = strlen(s);
-  res = caml_alloc_string(len);
-  memmove(String_val(res), s, len);
+  res = caml_alloc_initialized_string(len, s);
   return res;
 }
 
@@ -154,6 +161,7 @@ CAMLexport value caml_alloc_array(value (*funct)(char const *),
 /* [len] is a number of floats */
 CAMLprim value caml_alloc_float_array(mlsize_t len)
 {
+#ifdef FLAT_FLOAT_ARRAY
   mlsize_t wosize = len * Double_wosize;
   value result;
   /* For consistency with [caml_make_vect], which can't tell whether it should
@@ -169,6 +177,9 @@ CAMLprim value caml_alloc_float_array(mlsize_t len)
     result = caml_check_urgent_gc (result);
   }
   return result;
+#else
+  return caml_alloc (len, 0);
+#endif
 }
 
 
@@ -225,7 +236,7 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
   if (tag == Double_array_tag){
     size = Wosize_val (newval) / Double_wosize;
     for (i = 0; i < size; i++){
-      Store_double_field (dummy, i, Double_field (newval, i));
+      Store_double_flat_field (dummy, i, Double_flat_field (newval, i));
     }
   }else{
     for (i = 0; i < size; i++){

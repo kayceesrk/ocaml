@@ -54,18 +54,18 @@ endif
 
 CFLAGS += $(IFLEXDIR)
 
+ifneq "$(CCOMPTYPE)" "msvc"
+CFLAGS += -g
+endif
+
 DFLAGS=$(CFLAGS) -DDEBUG
 IFLAGS=$(CFLAGS) -DCAML_INSTR
 PICFLAGS=$(CFLAGS) $(SHAREDCCCOMPOPTS)
 
-ifneq "$(CCOMPTYPE)" "msvc"
-DFLAGS += -g
-endif
-
 DBGO=d.$(O)
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
-LIBS = $(call SYSLIB,ws2_32) $(EXTRALIBS)
+LIBS = $(BYTECCLIBS) $(EXTRALIBS)
 ifdef BOOTSTRAPPING_FLEXLINK
 MAKE_OCAMLRUN=$(MKEXE_BOOT)
 else
@@ -174,13 +174,13 @@ libcamlrun.$(A): $(OBJS)
 	$(call MKLIB,$@, $^)
 
 ocamlrund$(EXE): prims.$(O) libcamlrund.$(A)
-	$(MKEXE) $(MKEXEDEBUGFLAG) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(MKEXE) $(MKEXEDEBUGFLAG) -o $@ $^ $(LIBS)
 
 libcamlrund.$(A): $(DOBJS)
 	$(call MKLIB,$@, $^)
 
 ocamlruni$(EXE): prims.$(O) libcamlruni.$(A)
-	$(MKEXE) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(MKEXE) -o $@ $^ $(LIBS)
 
 libcamlruni.$(A): $(IOBJS)
 	$(call MKLIB,$@, $^)
@@ -209,10 +209,10 @@ depend:
 	$(error Dependencies cannot be regenerated using the MSVC ports)
 else
 depend: prims.c caml/opnames.h caml/jumptbl.h caml/version.h
-	$(CC) -MM $(CFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.$$(O)/' > .depend
-	$(CC) -MM $(DFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.d.$$(O)/' >> .depend
-	$(CC) -MM $(IFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.i.$$(O)/' >> .depend
-	$(CC) -MM $(PICFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.pic.$$(O)/' >> .depend
+	$(CC) -MM $(CFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.$$(O)/'>.$@
+	$(CC) -MM $(DFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.d.$$(O)/'>>.$@
+	$(CC) -MM $(IFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.i.$$(O)/'>>.$@
+	$(CC) -MM $(PICFLAGS) $(CPPFLAGS) *.c | sed -e 's/\.o/.pic.$$(O)/'>>.$@
 endif
 
 include .depend
