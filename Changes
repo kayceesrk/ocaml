@@ -139,6 +139,9 @@ Release branch for 4.06:
   pretty-printing items. New fields have been added to the
   formatter_out_functions record, thus this change will break any code building
   such record from scratch.
+  When building Format.formatter_out_functions values redefinining the out_spaces field,
+  "{ fmt_out_funs with out_spaces = f; }" should be replaced by
+  "{ fmt_out_funs with out_spaces = f; out_indent = f; }" to maintain the old behavior.
   (Richard Bonichon and Pierre Weis, review by Alain Frisch)
 
 * GPR#943: Fixed the divergence of the Pervasives module between the stdlib
@@ -463,7 +466,7 @@ Release branch for 4.06:
 ### Runtime system:
 
 * MPR#3771, GPR#153, GPR#1200, GPR#1357, GPR#1362, GPR#1363, GPR#1369, GPR#1398,
-  GPR#1446: Unicode support for the Windows runtime.
+  GPR#1446, GPR#1448: Unicode support for the Windows runtime.
   (ygrek, Nicolas Ojeda Bar, review by Alain Frisch, David Allsopp, Damien
   Doligez)
 
@@ -513,7 +516,7 @@ Release branch for 4.06:
 - GPR#1338: Add "-g" for bytecode runtime system compilation
   (Mark Shinwell)
 
-* GPR#1416: switch the Windows 10 Console to UTF-8 encoding.
+* GPR#1416, GPR#1444: switch the Windows 10 Console to UTF-8 encoding.
   (David Allsopp, reviews by Nicolás Ojeda Bär and Xavier Leroy)
 
 - MPR#7658, GPR#1439: Fix Spacetime runtime system compilation with
