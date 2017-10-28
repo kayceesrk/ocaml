@@ -186,7 +186,13 @@ let primitive ppf = function
         | Assignment -> ""
       in
       fprintf ppf "setfield_%s%s_computed" instr init
-  | Pfloatfield n -> fprintf ppf "floatfield %i" n
+  | Pfloatfield (n, mut) ->
+      let instr =
+        match mut with
+        | Mutable -> "floatfield"
+        | Immutable -> "floatfield_imm"
+      in
+      fprintf ppf "%s %i" instr n
   | Psetfloatfield (n, init) ->
       let init =
         match init with

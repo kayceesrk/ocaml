@@ -1291,7 +1291,7 @@ let make_field_args loc binding_kind arg first_pos last_pos argl =
   let rec make_args pos =
     if pos > last_pos
     then argl
-    else (Lprim(Pfield(pos, true, Immutable), [arg], loc), binding_kind)
+    else (Lprim(Pfield(pos, Pointer (* KC: is this correct? *), Immutable), [arg], loc), binding_kind)
          :: make_args (pos + 1)
   in make_args first_pos
 

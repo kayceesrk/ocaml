@@ -329,7 +329,7 @@ let comp_primitive p args =
   | Pfield_computed(_ptr, _mut) -> Kgetvectitem
   | Psetfield(n, _ptr, _init) -> Ksetfield n
   | Psetfield_computed(_ptr, _init) -> Ksetvectitem
-  | Pfloatfield n -> Kgetfloatfield n
+  | Pfloatfield (n, _mut) -> Kgetfloatfield n
   | Psetfloatfield (n, _init) -> Ksetfloatfield n
   | Pduprecord _ -> Kccall("caml_obj_dup", 1)
   | Pccall p -> Kccall(p.prim_name, p.prim_arity)

@@ -605,7 +605,7 @@ and transl_structure loc fields cc rootpath final_env = function
                   rebind_idents (pos + 1) (id :: newfields) ids
                 in
                 Llet(Alias, Pgenval, id,
-                     Lprim(Pfield pos, [Lvar mid], incl.incl_loc), body),
+                     Lprim(Pfield (pos, Pointer, Mutable) (* XXX KC: Verify *), [Lvar mid], incl.incl_loc), body),
                 size
           in
           let body, size = rebind_idents 0 fields ids in

@@ -275,7 +275,7 @@ let rec build_class_init cla cstr super inh_init cl_init msubst top cl =
                  mkappl(Lprim(Pfield(1, Pointer, Mutable),
                               [lpath], Location.none),
                         Lvar cla ::
-                        if top then [Lprim(Pfield 3, [lpath], Location.none)]
+                        if top then [Lprim(Pfield (3, Pointer, Mutable) (* XXX KC: Verify *), [lpath], Location.none)]
                         else []),
                  bind_super cla super cl_init))
       | _ ->
@@ -683,7 +683,7 @@ let transl_class ids cl_id pub_meths cl vflag =
           [lfunction (self :: args)
              (if not (IdentSet.mem env (free_variables body')) then body' else
               Llet(Alias, Pgenval, env,
-                   Lprim(Pfield_computed,
+                   Lprim(Pfield_computed (Pointer, Mutable) (* XXX KC: Verify *),
                          [Lvar self; Lvar env2],
                          Location.none),
                    body'))]

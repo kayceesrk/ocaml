@@ -57,7 +57,8 @@ type operation =
   | Itailcall_imm of { func : string; label_after : label; }
   | Iextcall of { func : string; alloc : bool; label_after : label; }
   | Istackoffset of int
-  | Iload of Cmm.memory_chunk * Arch.addressing_mode
+  | Iload of Cmm.memory_chunk * Arch.addressing_mode * bool
+                                 (* false = immutable, true = mutable *)
   | Istore of Cmm.memory_chunk * Arch.addressing_mode * bool
                                  (* false = initialization, true = assignment *)
   | Ialloc of { words : int; label_after_call_gc : label option;

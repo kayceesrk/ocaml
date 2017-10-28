@@ -44,7 +44,7 @@ let rec build_closure_env env_param pos = function
     [] -> Tbl.empty
   | id :: rem ->
       Tbl.add id
-        (Uprim(Pfield(pos, true, Immutable), [Uvar env_param], Debuginfo.none))
+        (Uprim(Pfield(pos, Pointer, Immutable), [Uvar env_param], Debuginfo.none))
         (build_closure_env env_param (pos+1) rem)
 
 (* Auxiliary for accessing globals.  We change the name of the global
@@ -751,7 +751,7 @@ let check_constant_result lam ulam approx =
           let glb =
             Uprim(Pgetglobal (Ident.create_persistent id), [], Debuginfo.none)
           in
-          Uprim(Pfield(i, true, Immutable), [glb], Debuginfo.none), approx
+          Uprim(Pfield(i, Pointer, Immutable), [glb], Debuginfo.none), approx
       end
   | _ -> (ulam, approx)
 

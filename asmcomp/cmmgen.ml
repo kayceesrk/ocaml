@@ -735,7 +735,7 @@ let lookup_tag obj tag dbg =
 let lookup_label obj lab dbg =
   bind "lab" lab (fun lab ->
     let table = get_field obj 0 Mutable dbg in
-    addr_array_ref table lab)
+    addr_array_ref table lab Debuginfo.none)
 
 let call_cached_method obj tag cache pos args dbg =
   let arity = List.length args in
@@ -1746,7 +1746,7 @@ let rec transl env e =
   | Usend(kind, met, obj, args, dbg) ->
       let call_met obj args clos =
         if args = [] then
-          Cop(Capply typ_val, [get_field env clos 0 dbg; obj; clos], dbg)
+          Cop(Capply typ_val, [get_field clos 0 Immutable dbg; obj; clos], dbg)
         else
           let arity = List.length args + 1 in
           let cargs = Cconst_symbol(apply_function arity) :: obj ::
@@ -1989,12 +1989,12 @@ and transl_prim_1 env p arg dbg =
   | Pignore ->
       return_unit(remove_unit (transl env arg))
   (* Heap operations *)
-  | Pfield(n, is_ptr, mut) ->
-      get_field env (transl env arg) n mut dbg
-  | Pfloatfield n ->
+  | Pfield(n, _is_ptr, mut) ->
+      get_field (transl env arg) n mut dbg
+  | Pfloatfield (n, mut) ->
       let ptr = transl env arg in
       box_float dbg (
-        Cop(Cload (Double_u, Mutable),
+        Cop(Cload (Double_u, mut),
             [if n = 0 then ptr
                        else Cop(Cadda, [ptr; Cconst_int(n * size_float)], dbg)],
             dbg))
@@ -2108,7 +2108,7 @@ and transl_prim_1 env p arg dbg =
 and transl_prim_2 env p arg1 arg2 dbg =
   match p with
   (* Heap operations *)
-  | Pfield_computed ->
+  | Pfield_computed (_ptr, _mut) ->
       addr_array_ref (transl env arg1) (transl env arg2) dbg
   | Psetfield(n, ptr, init) ->
       begin match assignment_kind ptr init with
@@ -3149,16 +3149,15 @@ let apply_function_body arity =
   let arg = Array.make arity (Ident.create "arg") in
   for i = 1 to arity - 1 do arg.(i) <- Ident.create "arg" done;
   let clos = Ident.create "clos" in
-  let env = empty_env in
   let rec app_fun clos n =
     if n = arity-1 then
       Cop(Capply typ_val,
-          [get_field env (Cvar clos) 0 dbg; Cvar arg.(n); Cvar clos], dbg)
+          [get_field (Cvar clos) 0 Immutable dbg; Cvar arg.(n); Cvar clos], dbg)
     else begin
       let newclos = Ident.create "clos" in
       Clet(newclos,
            Cop(Capply typ_val,
-               [get_field env (Cvar clos) 0 dbg; Cvar arg.(n); Cvar clos], dbg),
+               [get_field (Cvar clos) 0 Immutable dbg; Cvar arg.(n); Cvar clos], dbg),
            app_fun newclos (n+1))
     end in
   let args = Array.to_list arg in
@@ -3166,9 +3165,9 @@ let apply_function_body arity =
   (args, clos,
    if arity = 1 then app_fun clos 0 else
    Cifthenelse(
-   Cop(Ccmpi Ceq, [get_field env (Cvar clos) 1 dbg; int_const arity], dbg),
+   Cop(Ccmpi Ceq, [get_field (Cvar clos) 1 Immutable dbg; int_const arity], dbg),
    Cop(Capply typ_val,
-       get_field env (Cvar clos) 2 dbg :: List.map (fun s -> Cvar s) all_args,
+       get_field (Cvar clos) 2 Immutable dbg :: List.map (fun s -> Cvar s) all_args,
        dbg),
    app_fun clos 0))
 
@@ -3178,12 +3177,11 @@ let send_function arity =
   let cache = Ident.create "cache"
   and obj = List.hd args
   and tag = Ident.create "tag" in
-  let env = empty_env in
   let clos =
     let cache = Cvar cache and obj = Cvar obj and tag = Cvar tag in
     let meths = Ident.create "meths" and cached = Ident.create "cached" in
     let real = Ident.create "real" in
-    let mask = get_field env (Cvar meths) 1 Mutable dbg in
+    let mask = get_field (Cvar meths) 1 Mutable dbg in
     let cached_pos = Cvar cached in
     let tag_pos = Cop(Cadda, [Cop (Cadda, [cached_pos; Cvar meths], dbg);
                               Cconst_int(3*size_addr-1)], dbg) in
@@ -3198,12 +3196,9 @@ let send_function arity =
     Cifthenelse(Cop(Ccmpa Cne, [tag'; tag], dbg),
                 cache_public_method (Cvar meths) tag cache dbg,
                 cached_pos),
-    get_field_computed
-      (Cvar meths)
-      (Cop(Casr, [Cop (Cadda, [Cvar real; Cconst_int(2*size_addr - 1)]);
-                 Cconst_int log2_size_addr]))
-      Mutable
-      dbg
+   Cop(Cload (Word_val, Mutable),
+         [Cop(Cadda, [Cop (Cadda, [Cvar real; Cvar meths], dbg);
+                Cconst_int(2*size_addr-1)], dbg)], dbg))))
   in
   let body = Clet(clos', clos, body) in
   let cache = cache in
@@ -3238,18 +3233,17 @@ let tuplify_function arity =
   let dbg = Debuginfo.none in
   let arg = Ident.create "arg" in
   let clos = Ident.create "clos" in
-  let env = empty_env in
   let rec access_components i =
     if i >= arity
     then []
-    else get_field env (Cvar arg) i dbg :: access_components(i+1) in
+    else get_field (Cvar arg) i Immutable dbg :: access_components(i+1) in
   let fun_name = "caml_tuplify" ^ string_of_int arity in
   Cfunction
    {fun_name;
     fun_args = [arg, typ_val; clos, typ_val];
     fun_body =
       Cop(Capply typ_val,
-          get_field env (Cvar clos) 2 dbg :: access_components 0 @ [Cvar clos],
+          get_field (Cvar clos) 2 Immutable dbg :: access_components 0 @ [Cvar clos],
           dbg);
     fun_fast = true;
     fun_dbg  = Debuginfo.none;
@@ -3288,11 +3282,10 @@ let final_curry_function arity =
   let dbg = Debuginfo.none in
   let last_arg = Ident.create "arg" in
   let last_clos = Ident.create "clos" in
-  let env = empty_env in
   let rec curry_fun args clos n =
     if n = 0 then
       Cop(Capply typ_val,
-          get_field env (Cvar clos) 2 dbg ::
+          get_field (Cvar clos) 2 Immutable dbg ::
             args @ [Cvar last_arg; Cvar clos],
           dbg)
     else
@@ -3300,14 +3293,14 @@ let final_curry_function arity =
         begin
       let newclos = Ident.create "clos" in
       Clet(newclos,
-           get_field env (Cvar clos) 3 dbg,
-           curry_fun (get_field env (Cvar clos) 2 dbg :: args) newclos (n-1))
+           get_field (Cvar clos) 3 Immutable dbg,
+           curry_fun (get_field (Cvar clos) 2 Immutable dbg :: args) newclos (n-1))
         end else
         begin
           let newclos = Ident.create "clos" in
           Clet(newclos,
-               get_field env (Cvar clos) 4 dbg,
-               curry_fun (get_field env (Cvar clos) 3 dbg :: args) newclos (n-1))
+               get_field (Cvar clos) 4 Immutable dbg,
+               curry_fun (get_field (Cvar clos) 3 Immutable dbg :: args) newclos (n-1))
     end in
   Cfunction
    {fun_name = "caml_curry" ^ string_of_int arity ^
@@ -3319,7 +3312,6 @@ let final_curry_function arity =
 
 let rec intermediate_curry_functions arity num =
   let dbg = Debuginfo.none in
-  let env = empty_env in
   if num = arity - 1 then
     [final_curry_function arity]
   else begin
@@ -3358,13 +3350,13 @@ let rec intermediate_curry_functions arity num =
           let rec iter i args clos =
             if i = 0 then
               Cop(Capply typ_val,
-                  (get_field env (Cvar clos) 2 dbg) :: args @ [Cvar clos],
+                  (get_field (Cvar clos) 2 Immutable dbg) :: args @ [Cvar clos],
                   dbg)
             else
               let newclos = Ident.create "clos" in
               Clet(newclos,
-                   get_field env (Cvar clos) 4 dbg,
-                   iter (i-1) (get_field env (Cvar clos) 3 dbg :: args) newclos)
+                   get_field (Cvar clos) 4 Immutable dbg,
+                   iter (i-1) (get_field (Cvar clos) 3 Immutable dbg :: args) newclos)
           in
           let cf =
             Cfunction
