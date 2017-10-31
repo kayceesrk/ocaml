@@ -640,7 +640,9 @@ let emit_instr i =
         | Word_int | Word_val | Double | Double_u ->
             `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
         end
-    | Lop(Istore(size, addr, _)) ->
+    | Lop(Istore(size, addr, is_assignment)) ->
+        if is_assignment then
+          `	dmb\n`;
         let src = i.arg.(0) in
         let base =
           match addr with
