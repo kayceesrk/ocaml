@@ -612,7 +612,7 @@ let emit_instr i =
         assert (n mod 16 = 0);
         emit_stack_adjustment (-n);
         stack_offset := !stack_offset + n
-    | Lop(Iload(size, addr, is_mut)) ->
+    | Lop(Iload(size, addr, _is_mut)) ->
         let dst = i.res.(0) in
         let base =
           match addr with
@@ -639,17 +639,6 @@ let emit_instr i =
             `	fcvt	{emit_reg dst}, s7\n`
         | Word_int | Word_val | Double | Double_u ->
             `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
-        end;
-        begin if is_mut then
-          let l = new_label () in
-          if register_class dst = 1 then begin
-            (* floating point register *)
-            `	fcmp	{emit_reg dst}, {emit_reg dst}\n`;
-            `	bne	{emit_label l}\n`
-          end else begin
-            `	cbz	{emit_reg dst}, {emit_label l}\n`
-          end;
-          `{emit_label l}:\n`
         end
     | Lop(Istore(size, addr, _)) ->
         let src = i.arg.(0) in
