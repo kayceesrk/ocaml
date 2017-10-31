@@ -32,7 +32,7 @@ type constant_defining_value =
   | Project_closure of Flambda.project_closure
   | Move_within_set_of_closures of Flambda.move_within_set_of_closures
   | Project_var of Flambda.project_var
-  | Field of Variable.t * int
+  | Field of Variable.t * int * Lambda.immediate_or_pointer * Asttypes.mutable_flag
   | Symbol_field of Symbol.t * int
   | Const of Flambda.const
   | Symbol of Symbol.t
@@ -62,7 +62,7 @@ let print_constant_defining_value ppf = function
   | Move_within_set_of_closures move ->
     Flambda.print_move_within_set_of_closures ppf move
   | Project_var project -> Flambda.print_project_var ppf project
-  | Field (var, field) -> Format.fprintf ppf "%a.(%d)" Variable.print var field
+  | Field (var, field, _ptr, _mut) -> Format.fprintf ppf "%a.(%d)" Variable.print var field
   | Symbol_field (sym, field) ->
     Format.fprintf ppf "%a.(%d)" Symbol.print sym field
   | Const const -> Flambda.print_const ppf const
@@ -89,7 +89,7 @@ let rec resolve_definition
     fetch_variable definitions v
       ~the_dead_constant
   | Symbol sym -> Symbol sym
-  | Field (v, n) ->
+  | Field (v, n, _ptr, _mut) ->
     begin match fetch_variable definitions v ~the_dead_constant with
     | Symbol s ->
       fetch_symbol_field definitions s n ~the_dead_constant

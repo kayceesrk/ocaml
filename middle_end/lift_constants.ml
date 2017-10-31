@@ -93,8 +93,8 @@ let assign_symbols_and_collect_constant_definitions
       | Project_closure ({ closure_id } as project_closure) ->
         assign_existing_symbol (closure_symbol ~backend  closure_id);
         record_definition (AA.Project_closure project_closure)
-      | Prim (Pfield index, [block], _) ->
-        record_definition (AA.Field (block, index))
+      | Prim (Pfield (index, ptr, mut), [block], _) ->
+        record_definition (AA.Field (block, index, ptr, mut))
       | Prim (Pfield _, _, _) ->
         Misc.fatal_errorf "[Pfield] with the wrong number of arguments"
           Flambda.print_named named
@@ -498,7 +498,7 @@ let translate_definition_and_resolve_alias inconstants
     in
     Some (Flambda.Set_of_closures set_of_closures)
   | Project_var _ -> None
-  | Field (_,_) | Symbol_field _ -> None
+  | Field (_,_,_,_) | Symbol_field _ -> None
   | Const _ -> None
   | Symbol _ -> None
   | Variable _ -> None

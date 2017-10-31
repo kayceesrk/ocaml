@@ -175,8 +175,8 @@ let primitives_table = create_hashtable 57 [
   "%loc_LINE", Ploc Loc_LINE;
   "%loc_POS", Ploc Loc_POS;
   "%loc_MODULE", Ploc Loc_MODULE;
-  "%field0", Pfield 0;
-  "%field1", Pfield 1;
+  "%field0", Pfield(0, Pointer, Mutable);
+  "%field1", Pfield(1, Pointer, Mutable);
   "%setfield0", Psetfield(0, Pointer, Assignment);
   "%makeblock", Pmakeblock(0, Immutable, None);
   "%makemutable", Pmakeblock(0, Mutable, None);
@@ -873,12 +873,16 @@ and transl_exp0 e =
   | Texp_field(arg, _, lbl) ->
       let targ = transl_exp arg in
       begin match lbl.lbl_repres with
-          Record_regular | Record_inlined _ ->
-          Lprim (Pfield lbl.lbl_pos, [targ], e.exp_loc)
+        | Record_regular | Record_inlined _ ->
+            let prim = Pfield(lbl.lbl_pos, maybe_pointer e, lbl.lbl_mut) in
+            Lprim (prim, [targ], e.exp_loc)
         | Record_unboxed _ -> targ
-        | Record_float -> Lprim (Pfloatfield lbl.lbl_pos, [targ], e.exp_loc)
+        | Record_float ->
+            let prim = Pfloatfield(lbl.lbl_pos, lbl.lbl_mut) in
+            Lprim (prim, [targ], e.exp_loc)
         | Record_extension ->
-          Lprim (Pfield (lbl.lbl_pos + 1), [targ], e.exp_loc)
+            let prim = Pfield(lbl.lbl_pos + 1, maybe_pointer e, lbl.lbl_mut) in
+            Lprim (prim, [targ], e.exp_loc)
       end
   | Texp_setfield(arg, _, lbl, newval) ->
       let access =
@@ -967,12 +971,13 @@ and transl_exp0 e =
   | Texp_new (cl, {Location.loc=loc}, _) ->
       Lapply{ap_should_be_tailcall=false;
              ap_loc=loc;
-             ap_func=Lprim(Pfield 0, [transl_class_path ~loc e.exp_env cl], loc);
+             ap_func=Lprim(Pfield(0, Pointer, Mutable),
+                           [transl_class_path ~loc e.exp_env cl], loc);
              ap_args=[lambda_unit];
              ap_inlined=Default_inline;
              ap_specialised=Default_specialise}
   | Texp_instvar(path_self, path, _) ->
-      Lprim(Pfield_computed,
+      Lprim(Pfield_computed(Pointer,Mutable) (* XXX: KC *),
             [transl_normal_path path_self; transl_normal_path path], e.exp_loc)
   | Texp_setinstvar(path_self, path, _, expr) ->
       transl_setinstvar e.exp_loc (transl_normal_path path_self) path expr
@@ -1021,7 +1026,7 @@ and transl_exp0 e =
       | `Constant_or_function ->
         (* a constant expr of type <> float gets compiled as itself *)
          transl_exp e
-      | `Float -> 
+      | `Float ->
           (* We don't need to wrap with Popaque: this forward
              block will never be shortcutted since it points to a float. *)
           Lprim(Pmakeblock(Obj.forward_tag, Immutable, None),
@@ -1258,14 +1263,18 @@ and transl_record loc env fields repres opt_init_expr =
       Array.mapi
         (fun i (_, definition) ->
            match definition with
-           | Kept typ ->
+           | Kept(typ, mut) ->
                let field_kind = value_kind env typ in
                let access =
                  match repres with
-                   Record_regular | Record_inlined _ -> Pfield i
+                 | Record_regular | Record_inlined _ ->
+                     Pfield(i, maybe_pointer_type env typ, mut)
                  | Record_unboxed _ -> assert false
-                 | Record_extension -> Pfield (i + 1)
-                 | Record_float -> Pfloatfield i in
+                 | Record_extension ->
+                     Pfield (i + 1, maybe_pointer_type env typ, mut)
+                 | Record_float ->
+                     Pfloatfield(i, mut)
+               in
                Lprim(access, [Lvar init_id], loc), field_kind
            | Overridden (_lid, expr) ->
                let field_kind = value_kind expr.exp_env expr.exp_type in
@@ -1319,7 +1328,7 @@ and transl_record loc env fields repres opt_init_expr =
     let copy_id = Ident.create "newrecord" in
     let update_field cont (lbl, definition) =
       match definition with
-      | Kept _type -> cont
+      | Kept _ -> cont
       | Overridden (_lid, expr) ->
           let upd =
             match repres with

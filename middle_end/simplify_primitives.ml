@@ -278,7 +278,7 @@ let primitive (p : Lambda.primitive) (args, approxs) expr dbg ~size_int
     | [Value_float_array { size; contents }] ->
         begin match p with
         | Parraylength _ -> S.const_int_expr expr size
-        | Pfloatfield i ->
+        | Pfloatfield (i, _mut) ->
           begin match contents with
           | A.Contents a when i >= 0 && i < size ->
             begin match A.check_approx_for_float a.(i) with

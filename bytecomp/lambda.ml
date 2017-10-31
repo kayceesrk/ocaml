@@ -60,11 +60,11 @@ type primitive =
   | Psetglobal of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape
-  | Pfield of int
-  | Pfield_computed
+  | Pfield of int * immediate_or_pointer * mutable_flag
+  | Pfield_computed of immediate_or_pointer * mutable_flag
   | Psetfield of int * immediate_or_pointer * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
-  | Pfloatfield of int
+  | Pfloatfield of int * mutable_flag
   | Psetfloatfield of int * initialization_or_assignment
   | Pduprecord of Types.record_representation * int
   (* Force lazy values *)
@@ -528,7 +528,8 @@ let rec transl_normal_path = function
       then Lprim(Pgetglobal id, [], Location.none)
       else Lvar id
   | Pdot(p, _s, pos) ->
-      Lprim(Pfield pos, [transl_normal_path p], Location.none)
+      Lprim(Pfield(pos, Pointer, Immutable),
+            [transl_normal_path p], Location.none)
   | Papply _ ->
       fatal_error "Lambda.transl_path"
 

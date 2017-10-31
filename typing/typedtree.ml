@@ -127,7 +127,7 @@ and case =
     }
 
 and record_label_definition =
-  | Kept of Types.type_expr
+  | Kept of Types.type_expr * mutable_flag
   | Overridden of Longident.t loc * expression
 
 (* Value expressions for the class language *)
