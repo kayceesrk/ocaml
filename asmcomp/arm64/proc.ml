@@ -33,7 +33,8 @@ let word_addressed = false
     x0 - x15              general purpose (caller-save)
     x16, x17              temporaries (used by call veeners)
     x18                   platform register (reserved)
-    x19 - x25             general purpose (callee-save)
+    x19                   accumulator (used to enforce memory model; callee-save)
+    x20 - x25             general purpose (callee-save)
     x26                   trap pointer
     x27                   alloc pointer
     x28                   alloc limit
@@ -42,21 +43,22 @@ let word_addressed = false
     sp / xzr              stack pointer / zero register
    Floating-point register map:
     d0 - d7               general purpose (caller-save)
-    d8 - d15              general purpose (callee-save)
+    d8 - d14              general purpose (callee-save)
+    d15                   accumulator (used to enforce memory model; callee-save)
     d16 - d31             general purpose (caller-save)
 *)
 
 let int_reg_name =
   [| "x0";  "x1";  "x2";  "x3";  "x4";  "x5";  "x6";  "x7";
      "x8";  "x9";  "x10"; "x11"; "x12"; "x13"; "x14"; "x15";
-     "x19"; "x20"; "x21"; "x22"; "x23"; "x24"; "x25";
-     "x26"; "x27"; "x28"; "x16"; "x17" |]
+     "x20"; "x21"; "x22"; "x23"; "x24"; "x25";
+     "x26"; "x27"; "x28"; "x16"; "x17"; "x19" |]
 
 let float_reg_name =
   [| "d0";  "d1";  "d2";  "d3";  "d4";  "d5";  "d6";  "d7";
-     "d8";  "d9";  "d10"; "d11"; "d12"; "d13"; "d14"; "d15";
-     "d16"; "d17"; "d18"; "d19"; "d20"; "d21"; "d22"; "d23";
-     "d24"; "d25"; "d26"; "d27"; "d28"; "d29"; "d30"; "d31" |]
+     "d8"; "d9";  "d10"; "d11"; "d12"; "d13"; "d14"; "d16";
+     "d17"; "d18"; "d19"; "d20"; "d21"; "d22"; "d23"; "d24";
+     "d25"; "d26"; "d27"; "d28"; "d29"; "d30"; "d31"; "d15" |]
 
 let num_register_classes = 2
 
@@ -66,7 +68,7 @@ let register_class r =
   | Float -> 1
 
 let num_available_registers =
-  [| 23; 32 |] (* first 23 int regs allocatable; all float regs allocatable *)
+  [| 22; 31 |] (* first 22 int regs allocatable; first 31 float regs allocatable *)
 
 let first_available_register =
   [| 0; 100 |]
@@ -140,19 +142,19 @@ let outgoing ofs = Outgoing ofs
 let not_supported _ofs = fatal_error "Proc.loc_results: cannot call"
 
 (* OCaml calling convention:
-     first integer args in r0...r15
-     first float args in d0...d15
+     first integer args in x0...x15
+     first float args in d0...d14
      remaining args on stack.
-   Return values in r0...r15 or d0...d15. *)
+   Return values in r0...r15 or d0...d14. *)
 
 let max_arguments_for_tailcalls = 16
 
 let loc_arguments arg =
-  calling_conventions 0 15 100 115 outgoing arg
+  calling_conventions 0 15 100 114 outgoing arg
 let loc_parameters arg =
-  let (loc, _) = calling_conventions 0 15 100 115 incoming arg in loc
+  let (loc, _) = calling_conventions 0 15 100 114 incoming arg in loc
 let loc_results res =
-  let (loc, _) = calling_conventions 0 15 100 115 not_supported res in loc
+  let (loc, _) = calling_conventions 0 15 100 114 not_supported res in loc
 
 (* C calling convention:
      first integer args in r0...r7
