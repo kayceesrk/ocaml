@@ -184,8 +184,8 @@ let destroyed_at_c_call =
   Array.of_list (List.map phys_reg
     [0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;
      100;101;102;103;104;105;106;107;
-     116;117;118;119;120;121;122;123;
-     124;125;126;127;128;129;130;131])
+     115;116;117;118;119;120;121;122;
+     123;124;125;126;127;128;129;130])
 
 let destroyed_at_oper = function
   | Iop(Icall_ind _ | Icall_imm _) | Iop(Iextcall { alloc = true; }) ->
@@ -204,15 +204,15 @@ let destroyed_at_raise = all_phys_regs
 
 let safe_register_pressure = function
   | Iextcall _ -> 8
-  | Ialloc _ -> 25
-  | _ -> 26
+  | Ialloc _ -> 24
+  | _ -> 25
 
 let max_register_pressure = function
   | Iextcall _ -> [| 10; 8 |]
-  | Ialloc _ -> [| 25; 32 |]
+  | Ialloc _ -> [| 24; 31 |]
   | Iintoffloat | Ifloatofint
-  | Iload(Single, _, _) | Istore(Single, _, _) -> [| 26; 31 |]
-  | _ -> [| 26; 32 |]
+  | Iload(Single, _, _) | Istore(Single, _, _) -> [| 25; 30 |]
+  | _ -> [| 25; 31 |]
 
 (* Pure operations (without any side effect besides updating their result
    registers). *)
