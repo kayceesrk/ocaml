@@ -33,8 +33,7 @@ let word_addressed = false
     x0 - x15              general purpose (caller-save)
     x16, x17              temporaries (used by call veeners)
     x18                   platform register (reserved)
-    x19                   accumulator (used to enforce memory model; callee-save)
-    x20 - x25             general purpose (callee-save)
+    x19 - x25             general purpose (callee-save)
     x26                   trap pointer
     x27                   alloc pointer
     x28                   alloc limit
@@ -51,8 +50,8 @@ let word_addressed = false
 let int_reg_name =
   [| "x0";  "x1";  "x2";  "x3";  "x4";  "x5";  "x6";  "x7";
      "x8";  "x9";  "x10"; "x11"; "x12"; "x13"; "x14"; "x15";
-     "x20"; "x21"; "x22"; "x23"; "x24"; "x25";
-     "x26"; "x27"; "x28"; "x16"; "x17"; "x19" |]
+     "x19"; "x20"; "x21"; "x22"; "x23"; "x24"; "x25";
+     "x26"; "x27"; "x28"; "x16"; "x17" |]
 
 let float_reg_name =
   [| "d0";  "d1";  "d2";  "d3";  "d4";  "d5";  "d6";  "d7";
@@ -68,7 +67,7 @@ let register_class r =
   | Float -> 1
 
 let num_available_registers =
-  [| 22; 31 |] (* first 22 int regs allocatable; first 31 float regs allocatable *)
+  [| 23; 31 |] (* first 23 int regs allocatable; first 31 float regs allocatable *)
 
 let first_available_register =
   [| 0; 100 |]
@@ -204,12 +203,12 @@ let destroyed_at_raise = all_phys_regs
 
 let safe_register_pressure = function
   | Iextcall _ -> 8
-  | Ialloc _ -> 24
+  | Ialloc _ -> 25
   | _ -> 25
 
 let max_register_pressure = function
   | Iextcall _ -> [| 10; 8 |]
-  | Ialloc _ -> [| 24; 31 |]
+  | Ialloc _ -> [| 25; 31 |]
   | Iintoffloat | Ifloatofint
   | Iload(Single, _, _) | Istore(Single, _, _) -> [| 25; 30 |]
   | _ -> [| 25; 31 |]
