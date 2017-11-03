@@ -640,15 +640,9 @@ let emit_instr i =
         | Word_int | Word_val | Double | Double_u ->
             `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
         end;
-        begin if is_mut then
+        begin if is_mut && register_class dst = 0 (* not float *) then
           let l = new_label () in
-          if register_class dst = 1 then begin
-            (* floating point register *)
-            `	fcmp	{emit_reg dst}, {emit_reg dst}\n`;
-            `	bne	{emit_label l}\n`
-          end else begin
-            `	cbz	{emit_reg dst}, {emit_label l}\n`
-          end;
+          `	cbz	{emit_reg dst}, {emit_label l}\n`
           `{emit_label l}:\n`
         end
     | Lop(Istore(size, addr, _)) ->
