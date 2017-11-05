@@ -459,7 +459,7 @@ module BR = Branch_relaxation.Make (struct
       size 3 (2 + tocload_size()) (2 + tocload_size())
     | Lop(Iextcall { alloc = false; _}) -> size 1 2 2
     | Lop(Istackoffset _) -> 1
-    | Lop(Iload(chunk, addr)) ->
+    | Lop(Iload(chunk, addr, _)) ->
       if chunk = Byte_signed
       then load_store_size addr + 1
       else load_store_size addr
@@ -704,7 +704,7 @@ let emit_instr i =
         emit_load_store loadinstr addr i.arg 0 i.res.(0);
         if chunk = Byte_signed then
           `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`;
-        if is_mut && register_class = 0 (* not fp registers *) then begin
+        begin if is_mut && register_class = 0 (* not fp registers *) then
           let l = new_label () in
           let dst = i.res.(0) in
           `	{emit_string cmpg}i	{emit_reg dst}, 0\n`;
