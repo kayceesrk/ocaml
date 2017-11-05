@@ -704,9 +704,9 @@ let emit_instr i =
         emit_load_store loadinstr addr i.arg 0 i.res.(0);
         if chunk = Byte_signed then
           `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`;
-        begin if is_mut && register_class = 0 (* not fp registers *) then
+        let dst = i.res.(0) in
+        begin if is_mut && register_class dst = 0 (* not fp registers *) then
           let l = new_label () in
-          let dst = i.res.(0) in
           `	{emit_string cmpg}i	{emit_reg dst}, 0\n`;
           `	beq	{emit_label l}\n`;
           `{emit_label l}:\n`
