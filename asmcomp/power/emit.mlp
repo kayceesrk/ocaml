@@ -704,16 +704,11 @@ let emit_instr i =
         emit_load_store loadinstr addr i.arg 0 i.res.(0);
         if chunk = Byte_signed then
           `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`;
-        if is_mut then begin
+        if is_mut && register_class = 0 (* not fp registers *) then begin
           let l = new_label () in
           let dst = i.res.(0) in
-          if register_class dst = 1 (* floating-point register *) then
-            `	fcmpu	0, {emit_reg dst}, {emit_reg dst}\n`;
-            `	bf	{emit_int 0}, {emit_label l}\n`
-          else begin
-            `	{emit_string cmpg}i	{emit_reg dst}, 0\n`;
-            `	beq	{emit_label l}\n`
-          end;
+          `	{emit_string cmpg}i	{emit_reg dst}, 0\n`;
+          `	beq	{emit_label l}\n`;
           `{emit_label l}:\n`
         end
     | Lop(Istore(chunk, addr, _)) ->
