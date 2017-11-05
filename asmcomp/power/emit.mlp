@@ -689,7 +689,7 @@ let emit_instr i =
     | Lop(Istackoffset n) ->
         `	addi	1, 1, {emit_int (-n)}\n`;
         adjust_stack_offset n
-    | Lop(Iload(chunk, addr, is_mut)) ->
+    | Lop(Iload(chunk, addr, _is_mut)) ->
         let loadinstr =
           match chunk with
           | Byte_unsigned -> "lbz"
