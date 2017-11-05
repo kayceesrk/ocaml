@@ -703,15 +703,10 @@ let emit_instr i =
           | Double | Double_u -> "lfd" in
         emit_load_store loadinstr addr i.arg 0 i.res.(0);
         if chunk = Byte_signed then
-          `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`;
-        let dst = i.res.(0) in
-        begin if is_mut && register_class dst = 0 (* not fp registers *) then
-          let l = new_label () in
-          `	{emit_string cmpg}i	{emit_reg dst}, 0\n`;
-          `	beq	{emit_label l}\n`;
-          `{emit_label l}:\n`
-        end
-    | Lop(Istore(chunk, addr, _)) ->
+          `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`
+    | Lop(Istore(chunk, addr, is_mut)) ->
+        if is_mut then
+          `	lwsync\n`;
         let storeinstr =
           match chunk with
           | Byte_unsigned | Byte_signed -> "stb"
