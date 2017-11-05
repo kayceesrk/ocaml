@@ -689,7 +689,7 @@ let emit_instr i =
     | Lop(Istackoffset n) ->
         `	addi	1, 1, {emit_int (-n)}\n`;
         adjust_stack_offset n
-    | Lop(Iload(chunk, addr)) ->
+    | Lop(Iload(chunk, addr, is_mut)) ->
         let loadinstr =
           match chunk with
           | Byte_unsigned -> "lbz"
@@ -698,12 +698,24 @@ let emit_instr i =
           | Sixteen_signed -> "lha"
           | Thirtytwo_unsigned -> "lwz"
           | Thirtytwo_signed -> if ppc64 then "lwa" else "lwz"
-	  | Word_int | Word_val -> lg
+          | Word_int | Word_val -> lg
           | Single -> "lfs"
           | Double | Double_u -> "lfd" in
         emit_load_store loadinstr addr i.arg 0 i.res.(0);
         if chunk = Byte_signed then
-          `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`
+          `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`;
+        if is_mut then begin
+          let l = new_label () in
+          let dst = i.res.(0) in
+          if register_class dst = 1 (* floating-point register *) then
+            `	fcmpu	0, {emit_reg dst}, {emit_reg dst}\n`;
+            `	bf	{emit_int 0}, {emit_label l}\n`
+          else begin
+            `	{emit_string cmpg}i	{emit_reg dst}, 0\n`;
+            `	beq	{emit_label l}\n`
+          end;
+          `{emit_label l}:\n`
+        end
     | Lop(Istore(chunk, addr, _)) ->
         let storeinstr =
           match chunk with
