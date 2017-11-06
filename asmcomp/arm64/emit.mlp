@@ -642,8 +642,10 @@ let emit_instr i =
         end;
         begin if is_mut && register_class dst = 0 (* not float *) then
           let l = new_label () in
-          `	cbz	{emit_reg dst}, {emit_label l}\n`;
-          `{emit_label l}:\n`
+          `	nop\n`;
+          `	nop\n`;
+          `	nop\n`;
+          `	nop\n`
         end
     | Lop(Istore(size, addr, _)) ->
         let src = i.arg.(0) in
