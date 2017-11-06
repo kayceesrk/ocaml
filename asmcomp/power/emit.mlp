@@ -706,7 +706,7 @@ let emit_instr i =
           `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Istore(chunk, addr, is_mut)) ->
         if is_mut then
-          `	lwsync\n`;
+          `	sync\n`;
         let storeinstr =
           match chunk with
           | Byte_unsigned | Byte_signed -> "stb"
