@@ -641,7 +641,6 @@ let emit_instr i =
             `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
         end;
         begin if is_mut && register_class dst = 0 (* not float *) then
-          let l = new_label () in
           `	nop\n`;
           `	nop\n`;
           `	nop\n`;
