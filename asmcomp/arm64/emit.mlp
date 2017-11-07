@@ -437,7 +437,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Iextcall { alloc = false; }) -> 1
     | Lop (Iextcall { alloc = true; }) -> 3
     | Lop (Istackoffset _) -> 2
-    | Lop (Iload (size, addr, _))
+    | Lop (Iload (size, addr, _)) ->
       let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
       let nop = match size with Double | Double_u -> 0 | _ -> 1 in
       based + nop + begin match size with Single -> 2 | _ -> 1 end
