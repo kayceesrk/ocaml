@@ -442,7 +442,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Istackoffset _) -> 2
     | Lop (Iload (size, addr, _)) | Lop (Istore (size, addr, _)) ->
       let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
-      based + begin match size with Single -> 2 | _ -> 1 end
+      based + 1 + begin match size with Single -> 2 | _ -> 1 end
     | Lop (Ialloc {words = num_words}) when !fastcode_flag ->
       if num_words <= 0xFFF then 4 else 5
     | Lop (Ispecific (Ifar_alloc {words = num_words})) when !fastcode_flag ->
