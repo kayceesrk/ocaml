@@ -47,6 +47,13 @@ uintnat caml_use_huge_pages = 0;
 
 extern uintnat caml_percent_free;                   /* major_gc.c */
 
+uintnat caml_count_var_immutable_load = 0;
+uintnat caml_count_var_pointer_load = 0;
+uintnat caml_count_var_float_load = 0;
+uintnat caml_count_var_other_prim_load = 0;
+uintnat caml_count_var_init_store = 0;
+uintnat caml_count_var_mutable_store = 0;
+
 /* Page table management */
 
 #define Page(p) ((uintnat) (p) >> Page_log)

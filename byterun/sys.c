@@ -113,6 +113,14 @@ static void caml_sys_check_path(value name)
   }
 }
 
+extern uintnat caml_count_var_immutable_load;
+extern uintnat caml_count_var_pointer_load;
+extern uintnat caml_count_var_float_load;
+extern uintnat caml_count_var_other_prim_load;
+extern uintnat caml_count_var_init_store;
+extern uintnat caml_count_var_mutable_store;
+
+
 CAMLprim value caml_sys_exit(value retcode_v)
 {
   int retcode = Int_val(retcode_v);
@@ -146,6 +154,18 @@ CAMLprim value caml_sys_exit(value retcode_v)
                     top_heap_words);
     caml_gc_message(0x400, "compactions: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
                     cpct);
+    caml_gc_message(0x400, "immutable_loads: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    caml_count_var_immutable_load);
+    caml_gc_message(0x400, "pointer_loads: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    caml_count_var_pointer_load);
+    caml_gc_message(0x400, "float_loads: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    caml_count_var_float_load);
+    caml_gc_message(0x400, "other_prim_loads: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    caml_count_var_other_prim_load);
+    caml_gc_message(0x400, "init_stores: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    caml_count_var_init_store);
+    caml_gc_message(0x400, "mutable_stores: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    caml_count_var_mutable_store);
   }
 
 #ifndef NATIVE_CODE

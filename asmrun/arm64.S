@@ -550,6 +550,32 @@ caml_ml_array_bound_error:
         .type   caml_ml_array_bound_error, %function
         .size   caml_ml_array_bound_error, .-caml_ml_array_bound_error
 
+#define CAML_COUNT(kind) \
+        .align  2; \
+        .globl  caml_count_##kind; \
+caml_count_##kind: \
+        CFI_STARTPROC; \
+        PROFILE; \
+        LOADGLOBAL(TMP,caml_count_var_##kind); \
+        add     TMP, TMP, #1; \
+        STOREGLOBAL(TMP,caml_count_var_##kind); \
+        ret; \
+        CFI_ENDPROC; \
+        .type   caml_count_##kind, %function; \
+        .size   caml_count_##kind, .-caml_count_##kind
+
+CAML_COUNT(immutable_load)
+
+CAML_COUNT(pointer_load)
+
+CAML_COUNT(float_load)
+
+CAML_COUNT(other_prim_load)
+
+CAML_COUNT(init_store)
+
+CAML_COUNT(mutable_store)
+
         .globl  caml_system__code_end
 caml_system__code_end:
 

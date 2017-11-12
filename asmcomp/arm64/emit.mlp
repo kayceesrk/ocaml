@@ -27,6 +27,9 @@ open Mach
 open Linearize
 open Emitaux
 
+(* shadow the definition in Proc *)
+let contains_calls = ref true
+
 (* Tradeoff between code size and code speed *)
 
 let fastcode_flag = ref true
@@ -612,7 +615,7 @@ let emit_instr i =
         assert (n mod 16 = 0);
         emit_stack_adjustment (-n);
         stack_offset := !stack_offset + n
-    | Lop(Iload(size, addr, _is_mut)) ->
+    | Lop(Iload(size, addr, is_mut)) ->
         let dst = i.res.(0) in
         let base =
           match addr with
@@ -639,8 +642,17 @@ let emit_instr i =
             `	fcvt	{emit_reg dst}, s7\n`
         | Word_int | Word_val | Double | Double_u ->
             `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
+        end;
+        if not is_mut then
+          `	bl {emit_symbol "caml_count_immutable_load"}\n`
+        else begin match size with
+        | Word_val -> `	bl	{emit_symbol "caml_count_pointer_load"}\n`
+        | _ -> if register_class dst = 1 (* float *) then
+                 `	bl	{emit_symbol "caml_count_float_load"}\n`
+               else
+                 `	bl	{emit_symbol "caml_count_other_prim_load"}\n`
         end
-    | Lop(Istore(size, addr, _)) ->
+    | Lop(Istore(size, addr, is_init)) ->
         let src = i.arg.(0) in
         let base =
           match addr with
@@ -661,7 +673,11 @@ let emit_instr i =
             `	str	s7, {emit_addressing addr base}\n`;
         | Word_int | Word_val | Double | Double_u ->
             `	str	{emit_reg src}, {emit_addressing addr base}\n`
-        end
+        end;
+        if is_init then
+          `	bl	{emit_symbol "caml_count_init_store"}\n`
+        else
+          `	bl	{emit_symbol "caml_count_mutable_store"}\n`
     | Lop(Ialloc { words = n; label_after_call_gc; }) ->
         assembly_code_for_allocation i ~n ~far:false ?label_after_call_gc
     | Lop(Ispecific (Ifar_alloc { words = n; label_after_call_gc; })) ->
