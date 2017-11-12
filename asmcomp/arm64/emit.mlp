@@ -612,7 +612,7 @@ let emit_instr i =
         assert (n mod 16 = 0);
         emit_stack_adjustment (-n);
         stack_offset := !stack_offset + n
-    | Lop(Iload(size, addr, _is_mut)) ->
+    | Lop(Iload(size, addr, is_mut)) ->
         let dst = i.res.(0) in
         let base =
           match addr with
@@ -639,8 +639,11 @@ let emit_instr i =
             `	fcvt	{emit_reg dst}, s7\n`
         | Word_int | Word_val | Double | Double_u ->
             `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
+        end;
+        begin if is_mut then
+          `	dmb	ish\n`;
         end
-    | Lop(Istore(size, addr, _)) ->
+    | Lop(Istore(size, addr, is_assign)) ->
         let src = i.arg.(0) in
         let base =
           match addr with
@@ -661,6 +664,9 @@ let emit_instr i =
             `	str	s7, {emit_addressing addr base}\n`;
         | Word_int | Word_val | Double | Double_u ->
             `	str	{emit_reg src}, {emit_addressing addr base}\n`
+        end;
+        begin if not is_assign then
+          `	dmb	ish\n`
         end
     | Lop(Ialloc { words = n; label_after_call_gc; }) ->
         assembly_code_for_allocation i ~n ~far:false ?label_after_call_gc
