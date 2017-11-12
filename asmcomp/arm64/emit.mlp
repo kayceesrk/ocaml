@@ -652,7 +652,7 @@ let emit_instr i =
                else
                  `	bl	{emit_symbol "caml_count_other_prim_load"}\n`
         end
-    | Lop(Istore(size, addr, is_init)) ->
+    | Lop(Istore(size, addr, is_assign)) ->
         let src = i.arg.(0) in
         let base =
           match addr with
@@ -674,10 +674,10 @@ let emit_instr i =
         | Word_int | Word_val | Double | Double_u ->
             `	str	{emit_reg src}, {emit_addressing addr base}\n`
         end;
-        if is_init then
-          `	bl	{emit_symbol "caml_count_init_store"}\n`
-        else
+        if is_assign then
           `	bl	{emit_symbol "caml_count_mutable_store"}\n`
+        else
+          `	bl	{emit_symbol "caml_count_init_store"}\n`
     | Lop(Ialloc { words = n; label_after_call_gc; }) ->
         assembly_code_for_allocation i ~n ~far:false ?label_after_call_gc
     | Lop(Ispecific (Ifar_alloc { words = n; label_after_call_gc; })) ->
