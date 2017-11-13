@@ -439,7 +439,11 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Istackoffset _) -> 2
     | Lop (Iload (size, addr, _)) | Lop (Istore (size, addr, _)) ->
       let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
-      based + begin match size with Single -> 2 | _ -> 1 end
+      based + begin match size with
+              | Single -> 4
+              | Double | Double_u -> 3
+              | _ -> 2
+              end
     | Lop (Ialloc {words = num_words}) when !fastcode_flag ->
       if num_words <= 0xFFF then 4 else 5
     | Lop (Ispecific (Ifar_alloc {words = num_words})) when !fastcode_flag ->
@@ -644,8 +648,8 @@ let emit_instr i =
           let l = new_label () in
           if register_class dst = 1 then begin
             (* floating point register *)
-            `	fcmp	{emit_reg dst}, {emit_reg dst}\n`;
-            `	bne	{emit_label l}\n`
+            `	ldr	{emit_reg reg_tmp1}, {emit_addressing addr base}\n`;
+            `	cbz	{emit_reg reg_tmp1}, {emit_label l}\n`
           end else begin
             `	cbz	{emit_reg dst}, {emit_label l}\n`
           end;
