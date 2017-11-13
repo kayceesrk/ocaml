@@ -459,7 +459,8 @@ module BR = Branch_relaxation.Make (struct
       size 3 (2 + tocload_size()) (2 + tocload_size())
     | Lop(Iextcall { alloc = false; _}) -> size 1 2 2
     | Lop(Istackoffset _) -> 1
-    | Lop(Iload(chunk, addr, _)) ->
+    | Lop(Iload(chunk, addr, is_mut)) ->
+      (if is_mut then 2 else 0) +
       if chunk = Byte_signed
       then load_store_size addr + 1
       else load_store_size addr
