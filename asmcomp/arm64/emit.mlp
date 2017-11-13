@@ -437,7 +437,11 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Iextcall { alloc = false; }) -> 1
     | Lop (Iextcall { alloc = true; }) -> 3
     | Lop (Istackoffset _) -> 2
-    | Lop (Iload (size, addr, _)) | Lop (Istore (size, addr, _)) ->
+    | Lop (Iload (size, addr, _)) ->
+      let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
+      based + begin match size with Single -> 2 | _ -> 1 end
+    | Lop (Istore (size, addr, is_assign)) ->
+      (if not is_assign then 1 else 0) +
       let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
       based + begin match size with Single -> 2 | _ -> 1 end
     | Lop (Ialloc {words = num_words}) when !fastcode_flag ->
@@ -640,8 +644,8 @@ let emit_instr i =
         | Word_int | Word_val | Double | Double_u ->
             `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
         end
-    | Lop(Istore(size, addr, is_assignment)) ->
-        if is_assignment then
+    | Lop(Istore(size, addr, is_assign)) ->
+        if not is_assign then
           `	dmb	ish\n`;
         let src = i.arg.(0) in
         let base =
