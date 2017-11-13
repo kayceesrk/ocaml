@@ -463,7 +463,9 @@ module BR = Branch_relaxation.Make (struct
       if chunk = Byte_signed
       then load_store_size addr + 1
       else load_store_size addr
-    | Lop(Istore(_chunk, addr, _)) -> load_store_size addr
+    | Lop(Istore(_chunk, addr, is_assign)) ->
+        load_store_size addr +
+        if not is_assign then 1 else 0
     | Lop(Ialloc _) -> 4
     | Lop(Ispecific(Ialloc_far _)) -> 5
     | Lop(Iintop Imod) -> 3
@@ -704,8 +706,8 @@ let emit_instr i =
         emit_load_store loadinstr addr i.arg 0 i.res.(0);
         if chunk = Byte_signed then
           `	extsb	{emit_reg i.res.(0)}, {emit_reg i.res.(0)}\n`
-    | Lop(Istore(chunk, addr, is_mut)) ->
-        if is_mut then
+    | Lop(Istore(chunk, addr, is_assign)) ->
+        if not is_assign then
           `	lwsync\n`;
         let storeinstr =
           match chunk with
