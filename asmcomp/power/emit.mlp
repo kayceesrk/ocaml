@@ -459,11 +459,14 @@ module BR = Branch_relaxation.Make (struct
       size 3 (2 + tocload_size()) (2 + tocload_size())
     | Lop(Iextcall { alloc = false; _}) -> size 1 2 2
     | Lop(Istackoffset _) -> 1
-    | Lop(Iload(chunk, addr, _)) ->
+    | Lop(Iload(chunk, addr, is_mut)) ->
+      (if is_mut then 3 else 0) +
       if chunk = Byte_signed
       then load_store_size addr + 1
       else load_store_size addr
-    | Lop(Istore(_chunk, addr, _)) -> load_store_size addr
+    | Lop(Istore(_chunk, addr, is_assign)) ->
+        load_store_size addr +
+        if not is_assign then 1 else 0
     | Lop(Ialloc _) -> 4
     | Lop(Ispecific(Ialloc_far _)) -> 5
     | Lop(Iintop Imod) -> 3
@@ -714,9 +717,13 @@ let emit_instr i =
             `	{emit_string cmpg}i	{emit_reg dst}, 0\n`;
             `	beq	{emit_label l}\n`
           end;
-          `{emit_label l}:\n`
+          `{emit_label l}:\n`;
+          `	isync\n`;
         end
-    | Lop(Istore(chunk, addr, _)) ->
+    | Lop(Istore(chunk, addr, is_assign)) ->
+        begin if not is_assign then
+          `	lwsync\n`
+        end;
         let storeinstr =
           match chunk with
           | Byte_unsigned | Byte_signed -> "stb"
