@@ -37,6 +37,7 @@ let reg_trap_ptr = phys_reg 23
 let reg_alloc_ptr = phys_reg 24
 let reg_alloc_limit = phys_reg 25
 let reg_tmp1 = phys_reg 26
+let reg_tmp2 = phys_reg 27
 let reg_x15 = phys_reg 15
 
 (* Output a label *)
@@ -108,6 +109,13 @@ let emit_symbol_offset s ofs =
   if ofs > 0 then `+{emit_int ofs}`
   else if ofs < 0 then `-{emit_int (-ofs)}`
   else ()
+
+let load_address_in_tmp2 addr r =
+  match addr with
+  | Iindexed ofs ->
+      `	add	{emit_reg reg_tmp2}, {emit_reg r}, #{emit_int ofs}\n`
+  | Ibased(s, ofs) ->
+      `	add {emit_reg reg_tmp2}, {emit_reg r}, #:lo12:{emit_symbol_offset s ofs}\n`
 
 let emit_addressing addr r =
   match addr with
@@ -437,7 +445,15 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Iextcall { alloc = false; }) -> 1
     | Lop (Iextcall { alloc = true; }) -> 3
     | Lop (Istackoffset _) -> 2
-    | Lop (Iload (size, addr, _)) | Lop (Istore (size, addr, _)) ->
+    | Lop (Iload (size, addr, is_mut)) ->
+      (if not is_mut then 0
+       else match size with
+       | Byte_signed | Sixteen_signed | Thirtytwo_signed -> 2
+       | _ -> 1) +
+      let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
+      based + begin match size with Single -> 2 | _ -> 1 end
+    | Lop (Istore (size, addr, is_assign)) ->
+      (if is_assign then 0 else 1) +
       let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
       based + begin match size with Single -> 2 | _ -> 1 end
     | Lop (Ialloc {words = num_words}) when !fastcode_flag ->
@@ -621,32 +637,59 @@ let emit_instr i =
               assert (not !Clflags.dlcode);  (* see selection.ml *)
               `	adrp	{emit_reg reg_tmp1}, {emit_symbol_offset s ofs}\n`;
               reg_tmp1 in
-        begin match size with
-        | Byte_unsigned ->
-            `	ldrb	{emit_wreg dst}, {emit_addressing addr base}\n`
-        | Byte_signed ->
-            `	ldrsb	{emit_reg dst}, {emit_addressing addr base}\n`
-        | Sixteen_unsigned ->
-            `	ldrh	{emit_wreg dst}, {emit_addressing addr base}\n`
-        | Sixteen_signed ->
-            `	ldrsh	{emit_reg dst}, {emit_addressing addr base}\n`
-        | Thirtytwo_unsigned ->
-            `	ldr	{emit_wreg dst}, {emit_addressing addr base}\n`
-        | Thirtytwo_signed ->
-            `	ldrsw	{emit_reg dst}, {emit_addressing addr base}\n`
-        | Single ->
-            `	ldr	s7, {emit_addressing addr base}\n`;
-            `	fcvt	{emit_reg dst}, s7\n`
-        | Word_int | Word_val | Double | Double_u ->
-            `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
-        end;
-        begin if is_mut then
-          `	dmb	ish\n`;
+        if is_mut then begin match size with
+          | Byte_unsigned ->
+              load_address_in_tmp2 addr base;
+              `	ldarb	{emit_wreg dst}, [{emit_reg reg_tmp2}]\n`
+          | Byte_signed ->
+              load_address_in_tmp2 addr base;
+              `	ldarb	{emit_reg dst}, [{emit_reg reg_tmp2}]\n`;
+              `	sxtb	{emit_reg dst}, {emit_reg dst}\n`
+          | Sixteen_unsigned ->
+              load_address_in_tmp2 addr base;
+              `	ldarh	{emit_wreg dst}, [{emit_reg reg_tmp2}]\n`
+          | Sixteen_signed ->
+              load_address_in_tmp2 addr base;
+              `	ldarh	{emit_reg dst}, [{emit_reg reg_tmp2}]\n`;
+              ` sxth	{emit_reg dst}, {emit_reg dst}\n`
+          | Thirtytwo_unsigned ->
+              load_address_in_tmp2 addr base;
+              `	ldar	{emit_wreg dst}, [{emit_reg reg_tmp2}]\n`
+          | Thirtytwo_signed ->
+              load_address_in_tmp2 addr base;
+              `	ldar	{emit_wreg dst}, [{emit_reg reg_tmp2}]\n`;
+              `	sxtw	{emit_reg dst}, {emit_wreg dst}\n`
+          | Single ->
+              `	ldr	s7, {emit_addressing addr base}\n`;
+              `	fcvt	{emit_reg dst}, s7\n`;
+              `	dmb	ld\n`
+          | Word_int | Word_val ->
+              load_address_in_tmp2 addr base;
+              `	ldar	{emit_reg dst}, [{emit_reg reg_tmp2}]\n`
+          | Double | Double_u ->
+              `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`;
+              `	dmb	ld\n`
+        end else begin match size with
+          | Byte_unsigned ->
+              `	ldrb	{emit_wreg dst}, {emit_addressing addr base}\n`
+          | Byte_signed ->
+              `	ldrsb	{emit_reg dst}, {emit_addressing addr base}\n`
+          | Sixteen_unsigned ->
+              `	ldrh	{emit_wreg dst}, {emit_addressing addr base}\n`
+          | Sixteen_signed ->
+              `	ldrsh	{emit_reg dst}, {emit_addressing addr base}\n`
+          | Thirtytwo_unsigned ->
+              `	ldr	{emit_wreg dst}, {emit_addressing addr base}\n`
+          | Thirtytwo_signed ->
+              `	ldrsw	{emit_reg dst}, {emit_addressing addr base}\n`
+          | Single ->
+              `	ldr	s7, {emit_addressing addr base}\n`;
+              `	fcvt	{emit_reg dst}, s7\n`
+          | Word_int | Word_val | Double | Double_u ->
+              `	ldr	{emit_reg dst}, {emit_addressing addr base}\n`
+
         end
     | Lop(Istore(size, addr, is_assign)) ->
-        begin if not is_assign then
-          `	dmb	ish\n`
-        end;
         let src = i.arg.(0) in
         let base =
           match addr with
@@ -655,18 +698,42 @@ let emit_instr i =
               assert (not !Clflags.dlcode);
               `	adrp	{emit_reg reg_tmp1}, {emit_symbol_offset s ofs}\n`;
               reg_tmp1 in
-        begin match size with
-        | Byte_unsigned | Byte_signed ->
-            `	strb	{emit_wreg src}, {emit_addressing addr base}\n`
-        | Sixteen_unsigned | Sixteen_signed ->
-            `	strh	{emit_wreg src}, {emit_addressing addr base}\n`
-        | Thirtytwo_unsigned | Thirtytwo_signed ->
-            `	str	{emit_wreg src}, {emit_addressing addr base}\n`
-        | Single ->
-            `	fcvt	s7, {emit_reg src}\n`;
-            `	str	s7, {emit_addressing addr base}\n`;
-        | Word_int | Word_val | Double | Double_u ->
-            `	str	{emit_reg src}, {emit_addressing addr base}\n`
+        begin if not is_assign then
+          begin match size with
+          | Byte_unsigned | Byte_signed ->
+              load_address_in_tmp2 addr base;
+              `	stlrb	{emit_wreg src}, [{emit_reg reg_tmp2}]\n`
+          | Sixteen_unsigned | Sixteen_signed ->
+              load_address_in_tmp2 addr base;
+              `	stlrh	{emit_wreg src}, [{emit_reg reg_tmp2}]\n`
+          | Thirtytwo_unsigned | Thirtytwo_signed ->
+              load_address_in_tmp2 addr base;
+              `	stlr	{emit_wreg src}, [{emit_reg reg_tmp2}]\n`
+          | Single ->
+              `	dmb	st\n`;
+              `	fcvt	s7, {emit_reg src}\n`;
+              `	str	s7, {emit_addressing addr base}\n`;
+          | Word_int | Word_val ->
+              load_address_in_tmp2 addr base;
+              `	stlr	{emit_reg src}, [{emit_reg reg_tmp2}]\n`
+          | Double | Double_u ->
+              load_address_in_tmp2 addr base;
+              `	dmb	ish\n`;
+              `	str	{emit_reg src}, {emit_addressing addr base}\n`
+          end
+        else begin match size with
+          | Byte_unsigned | Byte_signed ->
+              `	strb	{emit_wreg src}, {emit_addressing addr base}\n`
+          | Sixteen_unsigned | Sixteen_signed ->
+              `	strh	{emit_wreg src}, {emit_addressing addr base}\n`
+          | Thirtytwo_unsigned | Thirtytwo_signed ->
+              `	str	{emit_wreg src}, {emit_addressing addr base}\n`
+          | Single ->
+              `	fcvt	s7, {emit_reg src}\n`;
+              `	str	s7, {emit_addressing addr base}\n`;
+          | Word_int | Word_val | Double | Double_u ->
+              `	str	{emit_reg src}, {emit_addressing addr base}\n`
+          end
         end
     | Lop(Ialloc { words = n; label_after_call_gc; }) ->
         assembly_code_for_allocation i ~n ~far:false ?label_after_call_gc
