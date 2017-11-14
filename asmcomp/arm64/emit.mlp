@@ -114,7 +114,7 @@ let load_address_in_tmp2 addr r =
   match addr with
   | Iindexed ofs ->
       `	mov {emit_reg reg_tmp2}, #{emit_int ofs}\n`;
-      `	add	{emit_reg reg_tmp2}, {emit_reg r}, #{emit_reg reg_tmp2}\n`
+      `	add	{emit_reg reg_tmp2}, {emit_reg r}, {emit_reg reg_tmp2}\n`
   | Ibased(s, ofs) ->
       `	add {emit_reg reg_tmp2}, {emit_reg r}, #:lo12:{emit_symbol_offset s ofs}\n`
 
@@ -446,14 +446,14 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Iextcall { alloc = false; }) -> 1
     | Lop (Iextcall { alloc = true; }) -> 3
     | Lop (Istackoffset _) -> 2
-    | Lop (Iload (size, addr, is_mut)) ->
+    | Lop (Iload (size, _addr, is_mut)) ->
       (if not is_mut then 0
        else match size with
        | Byte_signed | Sixteen_signed | Thirtytwo_signed -> 2
        | _ -> 1) +
       1 (* based or indexed *)
       + begin match size with Single -> 2 | _ -> 1 end
-    | Lop (Istore (size, addr, is_assign)) ->
+    | Lop (Istore (size, _addr, is_assign)) ->
       (if is_assign then 0 else 1) +
       1 (* based or indexed *)
       + begin match size with Single -> 2 | _ -> 1 end
