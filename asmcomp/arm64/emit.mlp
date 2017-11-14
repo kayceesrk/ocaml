@@ -113,7 +113,8 @@ let emit_symbol_offset s ofs =
 let load_address_in_tmp2 addr r =
   match addr with
   | Iindexed ofs ->
-      `	add	{emit_reg reg_tmp2}, {emit_reg r}, #{emit_int ofs}\n`
+      `	mov {emit_reg reg_tmp2}, #{emit_int ofs}\n`;
+      `	add	{emit_reg reg_tmp2}, {emit_reg r}, #{emit_reg reg_tmp2}\n`
   | Ibased(s, ofs) ->
       `	add {emit_reg reg_tmp2}, {emit_reg r}, #:lo12:{emit_symbol_offset s ofs}\n`
 
@@ -450,12 +451,12 @@ module BR = Branch_relaxation.Make (struct
        else match size with
        | Byte_signed | Sixteen_signed | Thirtytwo_signed -> 2
        | _ -> 1) +
-      let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
-      based + begin match size with Single -> 2 | _ -> 1 end
+      1 (* based or indexed *)
+      + begin match size with Single -> 2 | _ -> 1 end
     | Lop (Istore (size, addr, is_assign)) ->
       (if is_assign then 0 else 1) +
-      let based = match addr with Iindexed _ -> 0 | Ibased _ -> 1 in
-      based + begin match size with Single -> 2 | _ -> 1 end
+      1 (* based or indexed *)
+      + begin match size with Single -> 2 | _ -> 1 end
     | Lop (Ialloc {words = num_words}) when !fastcode_flag ->
       if num_words <= 0xFFF then 4 else 5
     | Lop (Ispecific (Ifar_alloc {words = num_words})) when !fastcode_flag ->
@@ -718,7 +719,7 @@ let emit_instr i =
               `	stlr	{emit_reg src}, [{emit_reg reg_tmp2}]\n`
           | Double | Double_u ->
               load_address_in_tmp2 addr base;
-              `	dmb	ish\n`;
+              `	dmb	st\n`;
               `	str	{emit_reg src}, {emit_addressing addr base}\n`
           end
         else begin match size with
