@@ -713,8 +713,8 @@ let emit_instr i =
           match chunk with
           | Byte_unsigned | Byte_signed -> "stb"
           | Sixteen_unsigned | Sixteen_signed -> "sth"
-	  | Thirtytwo_unsigned | Thirtytwo_signed -> "stw"
-	  | Word_int | Word_val -> stg
+	        | Thirtytwo_unsigned | Thirtytwo_signed -> "stw"
+	        | Word_int | Word_val -> stg
           | Single -> "stfs"
           | Double | Double_u -> "stfd" in
         emit_load_store storeinstr addr i.arg 1 i.arg.(0)
