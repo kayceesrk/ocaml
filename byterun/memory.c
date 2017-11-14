@@ -667,6 +667,10 @@ CAMLexport CAMLweakdef void caml_modify (value *fp, value val)
   */
   value old;
 
+#if defined(NATIVE_CODE)
+  asm volatile("lwsync":::"memory");
+#endif
+
   if (Is_young((value)fp)) {
     /* The modified object resides in the minor heap.
        Conditions 1 and 2 cannot occur. */
