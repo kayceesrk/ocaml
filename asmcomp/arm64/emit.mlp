@@ -646,7 +646,7 @@ let emit_instr i =
         end
     | Lop(Istore(size, addr, is_assign)) ->
         if not is_assign then
-          `	dmb	ish\n`;
+          `	dmb	ld\n`;
         let src = i.arg.(0) in
         let base =
           match addr with
