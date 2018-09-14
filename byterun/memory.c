@@ -503,7 +503,7 @@ static inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag,
     caml_fl_add_blocks ((value) new_block);
     hp = caml_fl_allocate (wosize);
   }
-  caml_stat_heap_blocks++;
+  caml_heap_blocks++;
 
   CAMLassert (Is_in_heap (Val_hp (hp)));
 

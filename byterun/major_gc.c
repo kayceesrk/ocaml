@@ -57,6 +57,7 @@ static asize_t gray_vals_size;
 static int heap_is_pure;   /* The heap is pure if the only gray objects
                               below [markhp] are also in [gray_vals]. */
 uintnat caml_allocated_words;
+uintnat caml_heap_blocks; /* Number of blocks that are alive or gabrage */
 uintnat caml_dependent_size, caml_dependent_allocated;
 double caml_extra_heap_resources;
 uintnat caml_fl_wsz_at_phase_change = 0;
@@ -556,7 +557,7 @@ static void sweep_slice (intnat work)
     if (caml_gc_sweep_hp < limit){
       hp = caml_gc_sweep_hp;
       hd = Hd_hp (hp);
-      work -= Whsize_hd (hd);
+      work--;
       caml_gc_sweep_hp += Bhsize_hd (hd);
       switch (Color_hd (hd)){
       case Caml_white:
@@ -565,7 +566,7 @@ static void sweep_slice (intnat work)
           if (final_fun != NULL) final_fun(Val_hp(hp));
         }
         caml_gc_sweep_hp = (char *) caml_fl_merge_block (Val_hp (hp));
-        caml_stat_heap_blocks--;
+        caml_heap_blocks--;
         break;
       case Caml_blue:
         /* Only the blocks of the free-list are blue.  See [freelist.c]. */
@@ -652,7 +653,7 @@ void caml_major_collection_slice (intnat howmuch)
                  MW = caml_stat_heap_wsz * 100 / (100 + caml_percent_free)
                       + caml_incremental_roots_count
      Amount of sweeping work for the GC cycle:
-                 SW = caml_stat_heap_blocks
+                 SW = caml_heap_blocks
      Total work:
                  TW = MW + SW
 
@@ -753,7 +754,7 @@ void caml_major_collection_slice (intnat howmuch)
     goto finished;
   }
 
-  computed_work = (intnat) (p * (caml_stat_heap_blocks +
+  computed_work = (intnat) (p * (caml_heap_blocks +
     ((double) caml_stat_heap_wsz * 100.0 / (100.0 + caml_percent_free)) +
     caml_incremental_roots_count));
 

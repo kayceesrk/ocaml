@@ -48,7 +48,6 @@ double caml_stat_minor_words = 0.0,
 intnat caml_stat_minor_collections = 0,
        caml_stat_major_collections = 0,
        caml_stat_heap_wsz = 0,
-       caml_stat_heap_blocks = 0,
        caml_stat_top_heap_wsz = 0,
        caml_stat_compactions = 0,
        caml_stat_heap_chunks = 0;
