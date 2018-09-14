@@ -565,6 +565,7 @@ static void sweep_slice (intnat work)
           if (final_fun != NULL) final_fun(Val_hp(hp));
         }
         caml_gc_sweep_hp = (char *) caml_fl_merge_block (Val_hp (hp));
+        caml_stat_heap_blocks--;
         break;
       case Caml_blue:
         /* Only the blocks of the free-list are blue.  See [freelist.c]. */
@@ -651,33 +652,16 @@ void caml_major_collection_slice (intnat howmuch)
                  MW = caml_stat_heap_wsz * 100 / (100 + caml_percent_free)
                       + caml_incremental_roots_count
      Amount of sweeping work for the GC cycle:
-                 SW = caml_stat_heap_wsz
-
-     In order to finish marking with a non-empty free list, we will
-     use 40% of the time for marking, and 60% for sweeping.
-
-     Let MT be the time spent marking, ST the time spent sweeping, and TT
-     the total time for this cycle. We have:
-                 MT = 40/100 * TT
-                 ST = 60/100 * TT
+                 SW = caml_stat_heap_blocks
+     Total work:
+                 TW = MW + SW
 
      Amount of time to spend on this slice:
-                 T  = P * TT = P * MT / (40/100) = P * ST / (60/100)
+                 T = P * TT
 
-     Since we must do MW work in MT time or SW work in ST time, the amount
-     of work for this slice is:
-                 MS = P * MW / (40/100)  if marking
-                 SS = P * SW / (60/100)  if sweeping
-
-     Amount of marking work for a marking slice:
-                 MS = P * MW / (40/100)
-                 MS = P * (caml_stat_heap_wsz * 250 / (100 + caml_percent_free)
-                           + 2.5 * caml_incremental_roots_count)
-     Amount of sweeping work for a sweeping slice:
-                 SS = P * SW / (60/100)
-                 SS = P * caml_stat_heap_wsz * 5 / 3
-
-     This slice will either mark MS words or sweep SS words.
+     Since we must do TW amount of work in TT time, the amount of work done
+     for this slice is:
+                 S = P * TW
   */
 
   if (caml_major_slice_begin_hook != NULL) (*caml_major_slice_begin_hook) ();
@@ -769,13 +753,10 @@ void caml_major_collection_slice (intnat howmuch)
     goto finished;
   }
 
-  if (caml_gc_phase == Phase_mark || caml_gc_phase == Phase_clean){
-    computed_work = (intnat) (p * ((double) caml_stat_heap_wsz * 250
-                                   / (100 + caml_percent_free)
-                                   + caml_incremental_roots_count));
-  }else{
-    computed_work = (intnat) (p * caml_stat_heap_wsz * 5 / 3);
-  }
+  computed_work = (intnat) (p * (caml_stat_heap_blocks +
+    ((double) caml_stat_heap_wsz * 100.0 / (100.0 + caml_percent_free)) +
+    caml_incremental_roots_count));
+
   caml_gc_message (0x40, "computed work = %"
                    ARCH_INTNAT_PRINTF_FORMAT "d words\n", computed_work);
   if (caml_gc_phase == Phase_mark){

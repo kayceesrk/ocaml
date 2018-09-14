@@ -48,6 +48,7 @@ double caml_stat_minor_words = 0.0,
 intnat caml_stat_minor_collections = 0,
        caml_stat_major_collections = 0,
        caml_stat_heap_wsz = 0,
+       caml_stat_heap_blocks = 0,
        caml_stat_top_heap_wsz = 0,
        caml_stat_compactions = 0,
        caml_stat_heap_chunks = 0;
@@ -201,7 +202,7 @@ static value heap_stats (int returnstats)
                         && Wosize_hp (prev_hp) > 0)
                     || cur_hp == caml_gc_sweep_hp);
         CAMLassert (Next (cur_hp) == chunk_end
-                    || (Color_hp (Next (cur_hp)) != Caml_blue 
+                    || (Color_hp (Next (cur_hp)) != Caml_blue
                        && Wosize_hp (Next (cur_hp)) > 0)
                     || (Whsize_hd (cur_hd) + Wosize_hp (Next (cur_hp))
                        > Max_wosize)

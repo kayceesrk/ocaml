@@ -29,6 +29,7 @@ extern intnat
      caml_stat_minor_collections,
      caml_stat_major_collections,
      caml_stat_heap_wsz,
+     caml_stat_heap_blocks,
      caml_stat_top_heap_wsz,
      caml_stat_compactions,
      caml_stat_heap_chunks;
