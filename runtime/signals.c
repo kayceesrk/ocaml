@@ -114,7 +114,7 @@ void caml_record_signal(int signal_number)
 #ifndef NATIVE_CODE
   caml_something_to_do = 1;
 #else
-  caml_young_limit = caml_young_alloc_end;
+  Caml_state->young_limit = caml_young_alloc_end;
 #endif
 }
 
@@ -251,13 +251,13 @@ void caml_execute_signal(int signal_number, int in_signal_handler)
 void caml_update_young_limit (void)
 {
   /* The minor heap grows downwards. The first trigger is the largest one. */
-  caml_young_limit = caml_memprof_young_trigger < caml_young_trigger ?
+  Caml_state->young_limit = caml_memprof_young_trigger < caml_young_trigger ?
     caml_young_trigger : caml_memprof_young_trigger;
 
 #ifdef NATIVE_CODE
   if(caml_requested_major_slice || caml_requested_minor_gc ||
      caml_signals_are_pending || caml_memprof_postponed_head != NULL)
-    caml_young_limit = caml_young_alloc_end;
+    Caml_state->young_limit = caml_young_alloc_end;
 #endif
 }
 
@@ -272,11 +272,11 @@ void caml_request_major_slice (void)
 #ifndef NATIVE_CODE
   caml_something_to_do = 1;
 #else
-  caml_young_limit = caml_young_alloc_end;
-  /* This is only moderately effective on ports that cache [caml_young_limit]
+  Caml_state->young_limit = caml_young_alloc_end;
+  /* This is only moderately effective on ports that cache [Caml_state->young_limit]
      in a register, since [caml_modify] is called directly, not through
      [caml_c_call], so it may take a while before the register is reloaded
-     from [caml_young_limit]. */
+     from [Caml_state->young_limit]. */
 #endif
 }
 
@@ -286,7 +286,7 @@ void caml_request_minor_gc (void)
 #ifndef NATIVE_CODE
   caml_something_to_do = 1;
 #else
-  caml_young_limit = caml_young_alloc_end;
+  Caml_state->young_limit = caml_young_alloc_end;
   /* Same remark as above in [caml_request_major_slice]. */
 #endif
 }
