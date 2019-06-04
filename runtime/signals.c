@@ -273,10 +273,10 @@ void caml_request_major_slice (void)
   caml_something_to_do = 1;
 #else
   Caml_state->young_limit = caml_young_alloc_end;
-  /* This is only moderately effective on ports that cache [Caml_state->young_limit]
-     in a register, since [caml_modify] is called directly, not through
-     [caml_c_call], so it may take a while before the register is reloaded
-     from [Caml_state->young_limit]. */
+  /* This is only moderately effective on ports that cache
+     [Caml_state->young_limit] in a register, since [caml_modify] is called
+     directly, not through [caml_c_call], so it may take a while before the
+     register is reloaded from [Caml_state->young_limit]. */
 #endif
 }
 

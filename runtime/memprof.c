@@ -362,8 +362,8 @@ void caml_memprof_track_young(tag_t tag, uintnat wosize)
      call the callback and use as a sample the block which will be
      allocated right after the callback. */
 
-  occurrences =
-    mt_generate_binom(caml_memprof_young_trigger - 1 - Caml_state->young_ptr) + 1;
+  occurrences = mt_generate_binom(caml_memprof_young_trigger - 1 -
+                                  Caml_state->young_ptr) + 1;
 
   /* Restore the minor heap in a valid state and suspend sampling for
      calling the callback.
