@@ -45,7 +45,7 @@ static intnat callstack_size = 0;
 static value memprof_callback = Val_unit;
 
 /* Pointer to the word following the next sample in the minor
-   heap. Equals [caml_young_alloc_start] if no sampling is planned in
+   heap. Equals [Caml_state->young_alloc_start] if no sampling is planned in
    the current minor heap.
    Invariant: [caml_memprof_young_trigger <= Caml_state->young_ptr].
  */
@@ -249,7 +249,7 @@ void caml_memprof_track_alloc_shr(value block)
 #ifndef NATIVE_CODE
     caml_something_to_do = 1;
 #else
-    Caml_state->young_limit = caml_young_alloc_end;
+    Caml_state->young_limit = Caml_state->young_alloc_end;
 #endif
   }
 }
@@ -305,10 +305,10 @@ void caml_memprof_handle_postponed()
    heap. */
 static void shift_sample(uintnat n)
 {
-  if(caml_memprof_young_trigger - caml_young_alloc_start > n)
+  if(caml_memprof_young_trigger - Caml_state->young_alloc_start > n)
     caml_memprof_young_trigger -= n;
   else
-    caml_memprof_young_trigger = caml_young_alloc_start;
+    caml_memprof_young_trigger = Caml_state->young_alloc_start;
   caml_update_young_limit();
 }
 
@@ -322,12 +322,12 @@ void caml_memprof_renew_minor_sample(void)
 {
 
   if(lambda == 0) /* No trigger in the current minor heap. */
-    caml_memprof_young_trigger = caml_young_alloc_start;
+    caml_memprof_young_trigger = Caml_state->young_alloc_start;
   else {
     uintnat geom = mt_generate_geom();
-    if(Caml_state->young_ptr - caml_young_alloc_start < geom)
+    if(Caml_state->young_ptr - Caml_state->young_alloc_start < geom)
       /* No trigger in the current minor heap. */
-      caml_memprof_young_trigger = caml_young_alloc_start;
+      caml_memprof_young_trigger = Caml_state->young_alloc_start;
     caml_memprof_young_trigger = Caml_state->young_ptr - (geom - 1);
   }
 
@@ -350,8 +350,8 @@ void caml_memprof_track_young(tag_t tag, uintnat wosize)
   }
 
   /* If [lambda == 0], then [caml_memprof_young_trigger] should be
-     equal to [caml_young_alloc_start]. But this function is only
-     called with [caml_young_alloc_start <= Caml_state->young_ptr <
+     equal to [Caml_state->young_alloc_start]. But this function is only
+     called with [Caml_state->young_alloc_start <= Caml_state->young_ptr <
      caml_memprof_young_trigger], which is contradictory. */
   CAMLassert(lambda > 0);
 
@@ -381,7 +381,7 @@ void caml_memprof_track_young(tag_t tag, uintnat wosize)
   /* We can now restore the minor heap in the state needed by
      [Alloc_small_aux].
      We should not call the GC after this. */
-  if(Caml_state->young_ptr - whsize < caml_young_trigger) {
+  if(Caml_state->young_ptr - whsize < Caml_state->young_trigger) {
     /* The call to [caml_gc_dispatch] may run arbitrary OCaml code via
        finalizers. We artificially fill the ephemeron with [Val_unit]
        so that the client code never sees the ephemeron empty before

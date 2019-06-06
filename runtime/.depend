@@ -238,8 +238,6 @@ parsing_b.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_b.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_b.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
@@ -601,8 +599,6 @@ parsing_bd.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_bd.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_bd.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
@@ -960,8 +956,6 @@ parsing_bi.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_bi.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_bi.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
@@ -1319,8 +1313,6 @@ parsing_bpic.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_bpic.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_bpic.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
@@ -1675,8 +1667,6 @@ parsing_n.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_n.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_n.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
@@ -2035,8 +2025,6 @@ parsing_nd.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_nd.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_nd.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
@@ -2391,8 +2379,6 @@ parsing_ni.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_ni.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_ni.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
@@ -2747,8 +2733,6 @@ parsing_npic.$(O): parsing.c caml/config.h caml/m.h caml/s.h caml/mlvalues.h \
  caml/major_gc.h caml/freelist.h caml/minor_gc.h caml/address_class.h \
  caml/memprof.h caml/domain.h caml/domain_state.h caml/domain_state.tbl \
  caml/alloc.h
-prims_npic.$(O): prims.c caml/mlvalues.h caml/config.h caml/m.h caml/s.h \
- caml/misc.h caml/prims.h
 printexc_npic.$(O): printexc.c caml/backtrace.h caml/mlvalues.h caml/config.h \
  caml/m.h caml/s.h caml/misc.h caml/exec.h caml/callback.h \
  caml/debugger.h caml/fail.h caml/misc.h caml/mlvalues.h caml/printexc.h \
