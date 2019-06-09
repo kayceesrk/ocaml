@@ -468,6 +468,8 @@ extern void caml_instr_atexit (void);
 
 #endif /* CAML_INSTR */
 
+#endif /* CAML_INTERNALS */
+
 /* The [backtrace_slot] type represents values stored in the
  * [caml_backtrace_buffer].  In bytecode, it is the same as a
  * [code_t], in native code it as a [frame_descr *].  The difference
@@ -475,8 +477,6 @@ extern void caml_instr_atexit (void);
  * so it is just exposed as a [backtrace_slot].
  */
 typedef void * backtrace_slot;
-
-#endif /* CAML_INTERNALS */
 
 #ifdef __cplusplus
 }
