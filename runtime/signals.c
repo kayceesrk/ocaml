@@ -255,7 +255,7 @@ void caml_update_young_limit (void)
     Caml_state->young_trigger : caml_memprof_young_trigger;
 
 #ifdef NATIVE_CODE
-  if(caml_requested_major_slice || caml_requested_minor_gc ||
+  if(Caml_state->requested_major_slice || Caml_state->requested_minor_gc ||
      caml_signals_are_pending || caml_memprof_postponed_head != NULL)
     Caml_state->young_limit = Caml_state->young_alloc_end;
 #endif
@@ -263,12 +263,9 @@ void caml_update_young_limit (void)
 
 /* Arrange for a garbage collection to be performed as soon as possible */
 
-int volatile caml_requested_major_slice = 0;
-int volatile caml_requested_minor_gc = 0;
-
 void caml_request_major_slice (void)
 {
-  caml_requested_major_slice = 1;
+  Caml_state->requested_major_slice = 1;
 #ifndef NATIVE_CODE
   caml_something_to_do = 1;
 #else
@@ -282,7 +279,7 @@ void caml_request_major_slice (void)
 
 void caml_request_minor_gc (void)
 {
-  caml_requested_minor_gc = 1;
+  Caml_state->requested_minor_gc = 1;
 #ifndef NATIVE_CODE
   caml_something_to_do = 1;
 #else

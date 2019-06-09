@@ -129,7 +129,7 @@ void caml_set_minor_heap_size (asize_t bsz)
   CAMLassert (bsz % sizeof (value) == 0);
   if (Caml_state->young_ptr != Caml_state->young_alloc_end){
     CAML_INSTR_INT ("force_minor/set_minor_heap_size@", 1);
-    caml_requested_minor_gc = 0;
+    Caml_state->requested_minor_gc = 0;
     Caml_state->young_trigger = Caml_state->young_alloc_mid;
     caml_update_young_limit();
     caml_empty_minor_heap ();
@@ -429,10 +429,10 @@ CAMLexport void caml_gc_dispatch (void)
   caml_instr_alloc_jump = 0;
 #endif
 
-  if (trigger == Caml_state->young_alloc_start || caml_requested_minor_gc){
+  if (trigger == Caml_state->young_alloc_start || Caml_state->requested_minor_gc){
     /* The minor heap is full, we must do a minor collection. */
     /* reset the pointers first because the end hooks might allocate */
-    caml_requested_minor_gc = 0;
+    Caml_state->requested_minor_gc = 0;
     Caml_state->young_trigger = Caml_state->young_alloc_mid;
     caml_update_young_limit();
     caml_empty_minor_heap ();
@@ -446,7 +446,7 @@ CAMLexport void caml_gc_dispatch (void)
     while (Caml_state->young_ptr - Caml_state->young_alloc_start < Max_young_whsize){
       /* The finalizers or the hooks have filled up the minor heap, we must
          repeat the minor collection. */
-      caml_requested_minor_gc = 0;
+      Caml_state->requested_minor_gc = 0;
       Caml_state->young_trigger = Caml_state->young_alloc_mid;
       caml_update_young_limit();
       caml_empty_minor_heap ();
@@ -455,9 +455,9 @@ CAMLexport void caml_gc_dispatch (void)
       CAML_INSTR_TIME (tmr, "dispatch/finalizers_minor");
     }
   }
-  if (trigger != Caml_state->young_alloc_start || caml_requested_major_slice){
+  if (trigger != Caml_state->young_alloc_start || Caml_state->requested_major_slice){
     /* The minor heap is half-full, do a major GC slice. */
-    caml_requested_major_slice = 0;
+    Caml_state->requested_major_slice = 0;
     Caml_state->young_trigger = Caml_state->young_alloc_start;
     caml_update_young_limit();
     caml_major_collection_slice (-1);
@@ -495,14 +495,14 @@ void caml_alloc_small_dispatch (tag_t tag, intnat wosize, int track)
 */
 CAMLexport void caml_minor_collection (void)
 {
-  caml_requested_minor_gc = 1;
+  Caml_state->requested_minor_gc = 1;
   caml_gc_dispatch ();
 }
 
 CAMLexport value caml_check_urgent_gc (value extra_root)
 {
   CAMLparam1 (extra_root);
-  if (caml_requested_major_slice || caml_requested_minor_gc){
+  if (Caml_state->requested_major_slice || Caml_state->requested_minor_gc){
     CAML_INSTR_INT ("force_minor/check_urgent_gc@", 1);
     caml_gc_dispatch();
   }
@@ -529,7 +529,7 @@ static void realloc_generic_table
   }else{
     asize_t sz;
     asize_t cur_ptr = tbl->ptr - tbl->base;
-    CAMLassert (caml_requested_minor_gc);
+    CAMLassert (Caml_state->requested_minor_gc);
 
     tbl->size *= 2;
     sz = (tbl->size + tbl->reserve) * element_size;
