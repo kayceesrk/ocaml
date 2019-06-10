@@ -571,8 +571,8 @@ LBL(caml_start_program):
     /* Build an exception handler */
         lea     LBL(108)(%rip), %r13
         pushq   %r13; CFI_ADJUST(8)
-        pushq   Caml_state(exn_handler); CFI_ADJUST(8)
-        movq    %rsp, Caml_state(exn_handler)
+        pushq   Caml_state(exception_pointer); CFI_ADJUST(8)
+        movq    %rsp, Caml_state(exception_pointer)
 #ifdef WITH_SPACETIME
         LOAD_VAR(caml_spacetime_trie_node_ptr, %r13)
 #endif
@@ -580,7 +580,7 @@ LBL(caml_start_program):
         call    *%r12
 LBL(107):
     /* Pop the exception handler */
-        popq    Caml_state(exn_handler); CFI_ADJUST(-8)
+        popq    Caml_state(exception_pointer); CFI_ADJUST(-8)
         popq    %r12; CFI_ADJUST(-8)   /* dummy register */
 LBL(109):
     /* Update alloc ptr */
@@ -611,8 +611,8 @@ FUNCTION(G(caml_raise_exn))
 CFI_STARTPROC
         testq   $1, Caml_state(backtrace_active)
         jne     LBL(110)
-        movq    Caml_state(exn_handler), %rsp
-        popq    Caml_state(exn_handler)
+        movq    Caml_state(exception_pointer), %rsp
+        popq    Caml_state(exception_pointer)
         ret
 LBL(110):
         movq    %rax, %r12            /* Save exception bucket */
@@ -625,14 +625,14 @@ LBL(110):
         popq    C_ARG_2               /* arg 2: pc of raise */
         movq    %rsp, C_ARG_3         /* arg 3: sp at raise */
 #endif
-        movq    Caml_state(exn_handler), C_ARG_4 /* arg 4: sp of handler */
+        movq    Caml_state(exception_pointer), C_ARG_4 /* arg 4: sp of handler */
         /* PR#5700: thanks to popq above, stack is now 16-aligned */
         /* Thanks to ENTER_FUNCTION, stack is now 16-aligned */
         PREPARE_FOR_C_CALL            /* no need to cleanup after */
         call    GCALL(caml_stash_backtrace)
         movq    %r12, %rax            /* Recover exception bucket */
-        movq    Caml_state(exn_handler), %rsp
-        popq    Caml_state(exn_handler)
+        movq    Caml_state(exception_pointer), %rsp
+        popq    Caml_state(exception_pointer)
         ret
 CFI_ENDPROC
 
@@ -644,8 +644,8 @@ CFI_STARTPROC
         testq   $1, Caml_state(backtrace_active)
         jne     LBL(112)
         movq    C_ARG_2, %rax
-        movq    Caml_state(exn_handler), %rsp  /* Cut stack */
-        popq    Caml_state(exn_handler) /* Recover previous exception handler */
+        movq    Caml_state(exception_pointer), %rsp  /* Cut stack */
+        popq    Caml_state(exception_pointer) /* Recover previous exception handler */
         movq    Caml_state(young_ptr), %r15 /* Reload alloc ptr */
         ret
 LBL(112):
@@ -657,15 +657,15 @@ LBL(112):
         movq    C_ARG_2, C_ARG_1                   /* arg 1: exception bucket */
         movq    Caml_state(last_return_address), C_ARG_2 /* arg 2: pc of raise */
         movq    Caml_state(bottom_of_stack), C_ARG_3    /* arg 3: sp of raise */
-        movq    Caml_state(exn_handler), C_ARG_4      /* arg 4: sp of handler */
+        movq    Caml_state(exception_pointer), C_ARG_4      /* arg 4: sp of handler */
 #ifndef WITH_FRAME_POINTERS
         subq    $8, %rsp              /* PR#5700: maintain stack alignment */
 #endif
         PREPARE_FOR_C_CALL            /* no need to cleanup after */
         call    GCALL(caml_stash_backtrace)
         movq    %r12, %rax            /* Recover exception bucket */
-        movq    Caml_state(exn_handler), %rsp
-        popq    Caml_state(exn_handler) /* Recover previous exception handler */
+        movq    Caml_state(exception_pointer), %rsp
+        popq    Caml_state(exception_pointer) /* Recover previous exception handler */
         movq    Caml_state(young_ptr), %r15 /* Reload alloc ptr */
         ret
 CFI_ENDPROC
@@ -679,8 +679,8 @@ CFI_ENDPROC
 FUNCTION(G(caml_stack_overflow))
         movq    C_ARG_1, %r14                 /* Caml_state */
         LEA_VAR(caml_exn_Stack_overflow, %rax)
-        movq    Caml_state(exn_handler), %rsp /* cut the stack */
-        popq    Caml_state(exn_handler)       /* recover previous exn handler */
+        movq    Caml_state(exception_pointer), %rsp /* cut the stack */
+        popq    Caml_state(exception_pointer)       /* recover previous exn handler */
         ret                                   /* jump to handler's code */
 
 /* Callback from C to OCaml */
