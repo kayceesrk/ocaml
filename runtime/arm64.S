@@ -27,6 +27,7 @@
 #define ARG x15
 #define TMP x16
 #define TMP2 x17
+#define ARG_DOMAIN_STATE_PTR x18
 
 #define C_ARG_1 x0
 #define C_ARG_2 x1
@@ -322,7 +323,7 @@ caml_c_call:
         .globl  caml_start_program
 caml_start_program:
         CFI_STARTPROC
-        mov     DOMAIN_STATE_PTR, C_ARG_1
+        mov     ARG_DOMAIN_STATE_PTR, C_ARG_1
         ADDRGLOBAL(ARG, caml_program)
 
 /* Code shared with caml_callback* */
@@ -345,6 +346,8 @@ caml_start_program:
         stp     d10, d11, [sp, 112]
         stp     d12, d13, [sp, 128]
         stp     d14, d15, [sp, 144]
+    /* Load domain state pointer from argument */
+        mov     DOMAIN_STATE_PTR, ARG_DOMAIN_STATE_PTR
     /* Setup a callback link on the stack */
         ldr     x8, Caml_state(bottom_of_stack)
         ldr     x9, Caml_state(last_return_address)
@@ -451,6 +454,8 @@ caml_raise_exception:
         CFI_STARTPROC
     /* Load the domain state ptr */
         mov     DOMAIN_STATE_PTR, C_ARG_1
+    /* Load the exception bucket */
+        mov     x0, C_ARG_2
     /* Reload trap ptr, alloc ptr and alloc limit */
         ldr     TRAP_PTR, Caml_state(exn_handler)
         ldr     ALLOC_PTR, Caml_state(young_ptr)
@@ -465,9 +470,9 @@ caml_raise_exception:
         ldr     TRAP_PTR, [sp], 16
         br      TMP
 2:  /* Preserve exception bucket in callee-save register x19 */
-        mov     x19, C_ARG_2
+        mov     x19, x0
     /* Stash the backtrace */
-        mov     C_ARG_1, C_ARG_2                      /* arg1: exn bucket */
+                                                      /* arg1: exn bucket */
         ldr     x1, Caml_state(last_return_address)   /* arg2: pc of raise */
         ldr     x2, Caml_state(bottom_of_stack)       /* arg3: sp of raise */
         mov     x3, TRAP_PTR   /* arg4: sp of handler */
@@ -487,8 +492,8 @@ caml_callback_asm:
         CFI_STARTPROC
     /* Initial shuffling of arguments */
     /* (x0 = Caml_state, x1 = closure, x2 = first arg) */
-        mov     DOMAIN_STATE_PTR, x0
-        mov     x0, x2          /* x0 = first arg */
+        mov     ARG_DOMAIN_STATE_PTR, x0
+        ldr     x0, [x2]        /* x0 = first arg */
                                 /* x1 = closure environment */
         ldr     ARG, [x1]       /* code pointer */
         b       .Ljump_to_caml
@@ -502,7 +507,7 @@ caml_callback2_asm:
         CFI_STARTPROC
     /* Initial shuffling of arguments */
     /* (x0 = Caml_state, x1 = closure, [x2] = arg1, [x2,8] = arg2) */
-        mov     DOMAIN_STATE_PTR, x0
+        mov     ARG_DOMAIN_STATE_PTR, x0
         mov     TMP, x1
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         mov     x2, TMP         /* x2 = closure environment */
@@ -518,7 +523,7 @@ caml_callback3_asm:
         CFI_STARTPROC
     /* Initial shuffling of arguments */
     /* (x0 = Caml_state, x1 = closure, [x2] = arg1, [x2,8] = arg2, [x2,16] = arg3) */
-        mov     DOMAIN_STATE_PTR, x0
+        mov     ARG_DOMAIN_STATE_PTR, x0
         mov     x3, x1          /* x3 = closure environment */
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         ldr     x2, [x2, 16]    /* x2 = third arg */

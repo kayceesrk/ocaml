@@ -882,7 +882,7 @@ let emit_instr i =
     | Lraise k ->
         begin match k with
         | Lambda.Raise_regular ->
-          let offset = Domainstate.(idx_of_field Domain_backtrace_pos) in
+          let offset = Domainstate.(idx_of_field Domain_backtrace_pos) * 8 in
           `	str	xzr, [{emit_reg reg_domain_state_ptr}, {emit_int offset}]\n`;
           `	bl	{emit_symbol "caml_raise_exn"}\n`;
           `{record_frame Reg.Set.empty true i.dbg}\n`
