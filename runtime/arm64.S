@@ -522,7 +522,8 @@ caml_callback2_asm:
 caml_callback3_asm:
         CFI_STARTPROC
     /* Initial shuffling of arguments */
-    /* (x0 = Caml_state, x1 = closure, [x2] = arg1, [x2,8] = arg2, [x2,16] = arg3) */
+    /* (x0 = Caml_state, x1 = closure, [x2] = arg1, [x2,8] = arg2,
+        [x2,16] = arg3) */
         mov     ARG_DOMAIN_STATE_PTR, x0
         mov     x3, x1          /* x3 = closure environment */
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */

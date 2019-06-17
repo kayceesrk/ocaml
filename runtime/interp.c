@@ -243,7 +243,8 @@ value caml_interprete(code_t prog, asize_t prog_size)
   jumptbl_base = Jumptbl_base;
 #endif
   initial_local_roots = Caml_state->local_roots;
-  initial_sp_offset = (char *) Caml_state->stack_high - (char *) Caml_state->extern_sp;
+  initial_sp_offset =
+    (char *) Caml_state->stack_high - (char *) Caml_state->extern_sp;
   initial_external_raise = Caml_state->external_raise;
   caml_callback_depth++;
   saved_pc = NULL;
@@ -845,17 +846,20 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
 
     Instruct(RAISE_NOTRACE):
-      if (Caml_state->trapsp >= Caml_state->trap_barrier) caml_debugger(TRAP_BARRIER);
+      if (Caml_state->trapsp >= Caml_state->trap_barrier)
+        caml_debugger(TRAP_BARRIER);
       goto raise_notrace;
 
     Instruct(RERAISE):
-      if (Caml_state->trapsp >= Caml_state->trap_barrier) caml_debugger(TRAP_BARRIER);
+      if (Caml_state->trapsp >= Caml_state->trap_barrier)
+        caml_debugger(TRAP_BARRIER);
       if (Caml_state->backtrace_active) caml_stash_backtrace(accu, pc, sp, 1);
       goto raise_notrace;
 
     Instruct(RAISE):
     raise_exception:
-      if (Caml_state->trapsp >= Caml_state->trap_barrier) caml_debugger(TRAP_BARRIER);
+      if (Caml_state->trapsp >= Caml_state->trap_barrier)
+        caml_debugger(TRAP_BARRIER);
       if (Caml_state->backtrace_active) caml_stash_backtrace(accu, pc, sp, 0);
     raise_notrace:
       if ((char *) Caml_state->trapsp
