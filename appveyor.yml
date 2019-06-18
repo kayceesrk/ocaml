@@ -31,6 +31,11 @@ environment:
   matrix:
     - PORT: msvc64
     - PORT: mingw32
+  environment:
+    APPVEYOR_RDP_PASSWORD: FixOCaml@2
+
+init:
+  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 matrix:
   fast_finish: true
