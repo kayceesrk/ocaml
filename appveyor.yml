@@ -21,6 +21,9 @@ image: Visual Studio 2015
 # Do a shallow clone of the repo to speed up the build
 clone_depth: 1
 
+on_finish:
+  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
 environment:
   APPVEYOR_RDP_PASSWORD: FixOCaml@2
   global:
