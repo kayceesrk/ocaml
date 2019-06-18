@@ -29,7 +29,7 @@
 
 OCaml is an implementation of the ML language, based on the Caml Light
 dialect extended with a complete class-based object system and a powerful
-module system in the style of Standard ML.
+module system in the style of Standard ML..
 
 OCaml comprises two compilers. One generates bytecode which is then
 interpreted by a C program. This compiler runs quickly, generates compact
