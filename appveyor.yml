@@ -22,6 +22,7 @@ image: Visual Studio 2015
 clone_depth: 1
 
 environment:
+  APPVEYOR_RDP_PASSWORD: FixOCaml@2
   global:
     CYG_ROOT: C:/cygwin64
     CYG_MIRROR: http://mirrors.kernel.org/sourceware/cygwin/
@@ -31,8 +32,6 @@ environment:
   matrix:
     - PORT: msvc64
     - PORT: mingw32
-  environment:
-    APPVEYOR_RDP_PASSWORD: FixOCaml@2
 
 init:
   - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
