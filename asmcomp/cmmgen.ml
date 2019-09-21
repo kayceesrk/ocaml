@@ -896,7 +896,9 @@ let rec expr_size env = function
   | Uvar id ->
       begin try V.find_same id env with Not_found -> RHS_nonrec end
   | Uclosure(fundecls, clos_vars) ->
-      RHS_block (fundecls_size fundecls + List.length clos_vars)
+      let num_func_size = if List.length fundecls < 2 then 0 else 1 in
+      RHS_block (fundecls_size fundecls + List.length clos_vars +
+                 num_func_size)
   | Ulet(_str, _kind, id, exp, body) ->
       expr_size (V.add (VP.var id) (expr_size env exp) env) body
   | Uletrec(bindings, body) ->
@@ -1975,10 +1977,35 @@ let rec transl env e =
         | fundecl::_ -> fundecl.dbg
       in
       Cconst_symbol (sym, dbg)
+  | Uclosure ([], clos_vars) ->
+      make_alloc Debuginfo.none Obj.closure_tag
+        (List.map (transl env) clos_vars)
+  | Uclosure ([fundecl], clos_vars) ->
+      Cmmgen_state.add_function fundecl;
+      let dbg = fundecl.dbg in
+      let transl_clos_vars = List.map (transl env) clos_vars in
+      let without_header =
+        if fundecl.arity = 1 || fundecl.arity = 0 then
+          Cconst_symbol (fundecl.label, dbg) ::
+          int_const dbg fundecl.arity ::
+          transl_clos_vars
+        else
+          Cconst_symbol (curry_function fundecl.arity, dbg) ::
+          int_const dbg fundecl.arity ::
+          Cconst_symbol (fundecl.label, dbg) ::
+          transl_clos_vars
+      in
+      make_alloc fundecl.dbg Obj.closure_tag without_header
   | Uclosure(fundecls, clos_vars) ->
+      let dbg =
+        match fundecls with
+        | [] -> Debuginfo.none
+        | fundecl::_ -> fundecl.dbg
+      in
       let rec transl_fundecls pos = function
           [] ->
-            List.map (transl env) clos_vars
+            List.fold_right (fun cv acc -> (transl env cv)::acc)
+              clos_vars [int_const dbg (List.length fundecls)]
         | f :: rem ->
             Cmmgen_state.add_function f;
             let dbg = f.dbg in
@@ -1995,11 +2022,6 @@ let rec transl env e =
             in
             if pos = 0 then without_header
             else (alloc_infix_header pos f.dbg) :: without_header
-      in
-      let dbg =
-        match fundecls with
-        | [] -> Debuginfo.none
-        | fundecl::_ -> fundecl.dbg
       in
       make_alloc dbg Obj.closure_tag (transl_fundecls 0 fundecls)
   | Uoffset(arg, offset) ->

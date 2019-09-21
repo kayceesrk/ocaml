@@ -233,6 +233,8 @@ CAMLextern value caml_get_public_method (value obj, value tag);
    See major_gc.c and stdlib/lazy.ml. */
 #define Lazy_tag 246
 
+#define Closurerec_tag 245
+
 /* Another special case: variants */
 CAMLextern value caml_hash_variant(char const * tag);
 

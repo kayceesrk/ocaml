@@ -74,6 +74,7 @@ val last_non_constant_constructor_tag : int
 
 val lazy_tag : int
 val closure_tag : int
+val closurerec_tag : int
 val object_tag : int
 val infix_tag : int
 val forward_tag : int

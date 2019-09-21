@@ -46,8 +46,9 @@ let unmarshal str pos =
   (Marshal.from_bytes str pos, pos + Marshal.total_size str pos)
 
 let first_non_constant_constructor_tag = 0
-let last_non_constant_constructor_tag = 245
+let last_non_constant_constructor_tag = 244
 
+let closurerec_tag = 245
 let lazy_tag = 246
 let closure_tag = 247
 let object_tag = 248
