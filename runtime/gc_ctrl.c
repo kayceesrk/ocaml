@@ -65,7 +65,7 @@ static void check_head (value v)
   if (Tag_val (v) == Infix_tag){
     int offset = Wsize_bsize (Infix_offset_val (v));
     value trueval = Val_op (&Field (v, -offset));
-    CAMLassert (Tag_val (trueval) == Closure_tag);
+    CAMLassert (Tag_val (trueval) == Closurerec_tag);
     CAMLassert (Wosize_val (trueval) > offset);
     CAMLassert (Is_in_heap (&Field (trueval, Wosize_val (trueval) - 1)));
   }else{

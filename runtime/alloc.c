@@ -226,7 +226,7 @@ CAMLprim value caml_alloc_dummy_float (value size)
 CAMLprim value caml_alloc_dummy_infix(value vsize, value voffset)
 {
   mlsize_t wosize = Long_val(vsize), offset = Long_val(voffset);
-  value v = caml_alloc(wosize, Closure_tag);
+  value v = caml_alloc(wosize, Closurerec_tag);
   if (offset > 0) {
     v += Bsize_wsize(offset);
     Hd_val(v) = Make_header(offset, Infix_tag, Caml_white);
@@ -251,7 +251,7 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
     }
   } else if (tag == Infix_tag) {
     value clos = newval - Infix_offset_hd(Hd_val(newval));
-    CAMLassert (Tag_val(clos) == Closure_tag);
+    CAMLassert (Tag_val(clos) == Closurerec_tag);
     CAMLassert (Tag_val(dummy) == Infix_tag);
     CAMLassert (Infix_offset_val(dummy) == Infix_offset_val(newval));
     dummy = dummy - Infix_offset_val(dummy);

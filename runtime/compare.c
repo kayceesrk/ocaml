@@ -238,6 +238,7 @@ static intnat do_compare_val(struct compare_stack* stk,
       compare_free_stack(stk);
       caml_invalid_argument("compare: abstract value");
     case Closure_tag:
+    case Closurerec_tag:
     case Infix_tag:
       compare_free_stack(stk);
       caml_invalid_argument("compare: functional value");

@@ -199,6 +199,7 @@ caml_trace_value_file (value v, code_t prog, asize_t proglen, FILE * f)
     int tg = Tag_val (v);
     int l = 0;
     switch (tg) {
+    case Closurerec_tag:
     case Closure_tag:
       fprintf (f, "=closure[s%d,cod%ld]",
                s, (long) ((code_t) (Code_val (v)) - prog));

@@ -91,7 +91,7 @@ static void invert_pointer_at (word *p)
 
         while (Ecolor (*hp) == 0) hp = (word *) *hp;
         CAMLassert (Ecolor (*hp) == 3);
-        if (Tag_ehd (*hp) == Closure_tag){
+        if (Tag_ehd (*hp) == Closurerec_tag){
           /* This is the first infix found in this block. */
           /* Save original header. */
           *p = *hp;

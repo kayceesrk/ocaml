@@ -37,7 +37,9 @@ value caml_check_value_is_closure(value v, value v_descr)
       (void*) v, descr);
     abort();
   }
-  if (!(Tag_val(v) == Closure_tag || Tag_val(v) == Infix_tag)) {
+  if (!(Tag_val(v) == Closure_tag ||
+        Tag_val(v) == Closurerec_tag ||
+        Tag_val(v) == Infix_tag)) {
     fprintf(stderr,
       "Expecting a closure, got a boxed value with tag %i: %s\n",
       Tag_val(v), descr);
@@ -45,7 +47,7 @@ value caml_check_value_is_closure(value v, value v_descr)
   }
   if (Tag_val(v) == Infix_tag) {
     v -= Infix_offset_val(v);
-    CAMLassert(Tag_val(v) == Closure_tag);
+    CAMLassert(Tag_val(v) == Closurerec_tag);
   }
   CAMLassert(Wosize_val(v) >= 2);
 

@@ -248,8 +248,8 @@ static inline value* mark_slice_darken(value *gray_vals_ptr,
         /* Closure blocks contain code pointers at offsets that cannot
            be reliably determined, so we always use the page table when
            marking such values. */
-        && (!(Tag_val (v) == Closure_tag || Tag_val (v) == Infix_tag) ||
-            Is_in_heap (child))) {
+        && (!(Tag_val (v) == Closure_tag || Tag_val (v) == Infix_tag ||
+              Tag_val (v) == Closurerec_tag) || Is_in_heap (child))) {
 #else
   if (Is_block (child) && Is_in_heap (child)) {
 #endif
