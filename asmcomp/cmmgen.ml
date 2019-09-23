@@ -2005,7 +2005,7 @@ let rec transl env e =
       let rec transl_fundecls pos = function
           [] ->
             List.fold_right (fun cv acc -> (transl env cv)::acc)
-              clos_vars [int_const dbg (List.length fundecls)]
+              clos_vars [int_const dbg (pos - 1)]
         | f :: rem ->
             Cmmgen_state.add_function f;
             let dbg = f.dbg in
@@ -2023,7 +2023,7 @@ let rec transl env e =
             if pos = 0 then without_header
             else (alloc_infix_header pos f.dbg) :: without_header
       in
-      make_alloc dbg Obj.closure_tag (transl_fundecls 0 fundecls)
+      make_alloc dbg Obj.closurerec_tag (transl_fundecls 0 fundecls)
   | Uoffset(arg, offset) ->
       (* produces a valid Caml value, pointing just after an infix header *)
       let ptr = transl env arg in

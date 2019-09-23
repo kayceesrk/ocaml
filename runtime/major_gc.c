@@ -244,12 +244,8 @@ static inline value* mark_slice_darken(value *gray_vals_ptr,
 #ifdef NATIVE_CODE_AND_NO_NAKED_POINTERS
   if (Is_block (child)
         && ! Is_young (child)
-        && Wosize_val (child) > 0  /* Atoms never need to be marked. */
-        /* Closure blocks contain code pointers at offsets that cannot
-           be reliably determined, so we always use the page table when
-           marking such values. */
-        && (!(Tag_val (v) == Closure_tag || Tag_val (v) == Infix_tag ||
-              Tag_val (v) == Closurerec_tag) || Is_in_heap (child))) {
+        && Wosize_val (child) > 0  /* Atoms never need to be marked. */) {
+    CAMLassert(!Is_in_code_area(child));
 #else
   if (Is_block (child) && Is_in_heap (child)) {
 #endif
@@ -392,6 +388,9 @@ static void mark_slice (intnat work)
   int slice_fields = 0;
 #endif
   int slice_pointers = 0; /** gcc removes it when not in CAML_INSTR */
+#ifdef NATIVE_CODE_AND_NO_NAKED_POINTERS
+  int arity = 0;
+#endif
 
   caml_gc_message (0x40, "Marking %"ARCH_INTNAT_PRINTF_FORMAT"d words\n", work);
   caml_gc_message (0x40, "Subphase = %d\n", caml_gc_subphase);
@@ -403,6 +402,19 @@ static void mark_slice (intnat work)
       CAMLassert (start == 0);
       v = *--gray_vals_ptr;
       CAMLassert (Is_gray_val (v));
+#ifdef NATIVE_CODE_AND_NO_NAKED_POINTERS
+      if (Tag_val(v) == Closure_tag) {
+        arity = Int_val(Field(v,1));
+        if (arity == 0 || arity == 1) {
+          start = 2;
+        } else {
+          start = 3;
+        }
+      } else if (Tag_val(v) == Closurerec_tag) {
+        start = Int_val(Field(v, Wosize_val(v) - 1));
+        CAMLassert (start < Wosize_val(v));
+      }
+#endif
     }
     if (v != 0){
       hd = Hd_val(v);
