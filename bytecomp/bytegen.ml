@@ -129,7 +129,7 @@ let rec push_dummies n k = match n with
 
 type rhs_kind =
   | RHS_block of int
-  | RHS_infix of { blocksize : int; offset : int }
+  | RHS_infix of { blocksize : int; offset : int; nfuncs : int }
   | RHS_floatblock of int
   | RHS_nonrec
   | RHS_function of int * int
@@ -166,10 +166,11 @@ let rec size_of_lambda env = function
       let fv =
         Ident.Set.elements (free_variables (Lletrec(bindings, lambda_unit))) in
       (* See Instruct(CLOSUREREC) in interp.c *)
-      let blocksize = List.length bindings * 2 - 1 + List.length fv in
+      let nfuncs = List.length bindings in
+      let blocksize = nfuncs * 2 - 1 + List.length fv in
       let offsets = List.mapi (fun i (id, _e) -> (id, i * 2)) bindings in
       let env = List.fold_right (fun (id, offset) env ->
-        Ident.add id (RHS_infix { blocksize; offset }) env) offsets env in
+        Ident.add id (RHS_infix { blocksize; offset; nfuncs }) env) offsets env in
       size_of_lambda env body
   | Lletrec(bindings, body) ->
       let env = List.fold_right
@@ -580,11 +581,13 @@ let rec comp_expr env exp sz cont =
               Kconst(Const_base(Const_int blocksize)) ::
               Kccall("caml_alloc_dummy", 1) :: Kpush ::
               comp_init (add_var id (sz+1) new_env) (sz+1) rem
-          | (id, _exp, RHS_infix { blocksize; offset }) :: rem ->
+          | (id, _exp, RHS_infix { blocksize; offset; nfuncs }) :: rem ->
+              Kconst(Const_base(Const_int nfuncs)) ::
+              Kpush ::
               Kconst(Const_base(Const_int offset)) ::
               Kpush ::
               Kconst(Const_base(Const_int blocksize)) ::
-              Kccall("caml_alloc_dummy_infix", 2) :: Kpush ::
+              Kccall("caml_alloc_dummy_infix", 3) :: Kpush ::
               comp_init (add_var id (sz+1) new_env) (sz+1) rem
           | (id, _exp, RHS_function (blocksize,arity)) :: rem ->
               Kconst(Const_base(Const_int arity)) ::

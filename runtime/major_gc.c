@@ -388,8 +388,8 @@ static void mark_slice (intnat work)
   int slice_fields = 0;
 #endif
   int slice_pointers = 0; /** gcc removes it when not in CAML_INSTR */
-#ifdef NATIVE_CODE_AND_NO_NAKED_POINTERS
-  int arity = 0;
+#ifdef NATIVE_CODE
+  mlsize_t arity = 0;
 #endif
 
   caml_gc_message (0x40, "Marking %"ARCH_INTNAT_PRINTF_FORMAT"d words\n", work);
@@ -402,19 +402,21 @@ static void mark_slice (intnat work)
       CAMLassert (start == 0);
       v = *--gray_vals_ptr;
       CAMLassert (Is_gray_val (v));
-#ifdef NATIVE_CODE_AND_NO_NAKED_POINTERS
       if (Tag_val(v) == Closure_tag) {
-        arity = Int_val(Field(v,1));
+#ifdef NATIVE_CODE
+        arity = Long_val(Field(v,1));
         if (arity == 0 || arity == 1) {
           start = 2;
         } else {
           start = 3;
         }
+#else
+        start = 1;
+#endif
       } else if (Tag_val(v) == Closurerec_tag) {
-        start = Int_val(Field(v, Wosize_val(v) - 1));
+        start = Long_val(Field(v, Wosize_val(v) - 1));
         CAMLassert (start < Wosize_val(v));
       }
-#endif
     }
     if (v != 0){
       hd = Hd_val(v);

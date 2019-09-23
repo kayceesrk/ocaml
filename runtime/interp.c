@@ -557,18 +557,27 @@ value caml_interprete(code_t prog, asize_t prog_size)
       mlsize_t blksize = nfuncs * 2 - 1 + nvars;
       int i;
       value * p;
+      tag_t ctag = Closure_tag;
+
+      if (nfuncs > 1) {
+        blksize++;
+        ctag = Closurerec_tag;
+      }
       if (nvars > 0) *--sp = accu;
       if (blksize <= Max_young_wosize) {
-        Alloc_small(accu, blksize, Closurerec_tag);
+        Alloc_small(accu, blksize, ctag);
         p = &Field(accu, nfuncs * 2 - 1);
         for (i = 0; i < nvars; i++, p++) *p = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
-        accu = caml_alloc_shr(blksize, Closurerec_tag);
+        accu = caml_alloc_shr(blksize, ctag);
         p = &Field(accu, nfuncs * 2 - 1);
         for (i = 0; i < nvars; i++, p++) caml_initialize(p, sp[i]);
+      }
+      if (nfuncs > 1) {
+        Field(accu, blksize-1) = Val_long(nfuncs * 2 - 1);
       }
       sp += nvars;
       /* The code pointers and infix headers are not in the heap,

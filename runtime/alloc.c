@@ -223,10 +223,21 @@ CAMLprim value caml_alloc_dummy_float (value size)
   return caml_alloc (wosize, 0);
 }
 
-CAMLprim value caml_alloc_dummy_infix(value vsize, value voffset)
+CAMLprim value caml_alloc_dummy_infix(value vsize, value voffset, value vnfuncs)
 {
   mlsize_t wosize = Long_val(vsize), offset = Long_val(voffset);
-  value v = caml_alloc(wosize, Closurerec_tag);
+  mlsize_t nfuncs = Long_val(vnfuncs);
+  value v;
+  tag_t ctag = Closure_tag;
+
+  if (nfuncs > 1) {
+    wosize++;
+    ctag = Closurerec_tag;
+  }
+  v = caml_alloc(wosize, ctag);
+  if (nfuncs > 1) {
+    Field(v, wosize - 1) = Val_long(nfuncs * 2 - 1);
+  }
   if (offset > 0) {
     v += Bsize_wsize(offset);
     Hd_val(v) = Make_header(offset, Infix_tag, Caml_white);
