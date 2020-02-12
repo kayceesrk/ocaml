@@ -164,7 +164,7 @@ let pic_code = ref (match Config.architecture with (* -fPIC *)
                      | "amd64" -> true
                      | _       -> false)
 
-let runtime_variant = ref "";;      (* -runtime-variant *)
+let runtime_variant = ref "i";;      (* -runtime-variant *)
 let with_runtime = ref true;;         (* -with-runtime *)
 
 let keep_docs = ref false              (* -keep-docs *)
