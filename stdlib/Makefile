@@ -93,7 +93,7 @@ endif
 
 ifeq "$(RUNTIMEI)" "true"
 install::
-	cp target_camlheaderi $(INSTALL_LIBDIR)
+	cp target_camlheaderi "$(INSTALL_LIBDIR)/camlheaderi"
 endif
 
 .PHONY: installopt
