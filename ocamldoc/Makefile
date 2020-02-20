@@ -22,7 +22,8 @@ OCAMLYACC ?= $(ROOTDIR)/boot/ocamlyacc
 STDLIBFLAGS = -nostdlib -I $(ROOTDIR)/stdlib
 OCAMLC    = $(OCAMLRUN) $(ROOTDIR)/ocamlc $(STDLIBFLAGS)
 ifeq "$(UNIX_OR_WIN32)" "unix"
-OCAMLOPT  = $(OCAMLRUN) $(ROOTDIR)/ocamlopt $(STDLIBFLAGS)
+OCAMLOPT  = $(OCAMLRUN) $(ROOTDIR)/ocamlopt $(STDLIBFLAGS) \
+						-I $(ROOTDIR)/byterun -I $(ROOTDIR)/asmrun
 else # Windows
   ifeq "$(wildcard $(ROOTDIR)/flexdll/Makefile)" ""
     FLEXLINK_ENV=
@@ -38,7 +39,7 @@ OCAMLLEX  = $(OCAMLRUN) $(ROOTDIR)/boot/ocamllex
 # If they are not, then the preprocessor logic (including the
 # remove_DEBUG script and the debug target) could be removed.
 # If they are, it may be better to be able to enable them at run-time
-# rather than compile-time, e.g. through a -debug command-line option. 
+# rather than compile-time, e.g. through a -debug command-line option.
 # In the following line, "sh" is useful under Windows. Without it,
 # the ./remove_DEBUG command would be executed by cmd.exe which would not
 # know how to handle it.

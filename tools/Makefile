@@ -85,7 +85,7 @@ endif
 
 CAMLC=$(CAMLRUN) ../boot/ocamlc -nostdlib -I ../boot \
       -use-prims ../byterun/primitives -I ..
-CAMLOPT=$(CAMLRUN) ../ocamlopt -nostdlib -I ../stdlib
+CAMLOPT=$(CAMLRUN) ../ocamlopt -nostdlib -I ../stdlib -I ../byterun -I ../asmrun
 ifeq "$(UNIX_OR_WIN32)" "win32"
   ifneq "$(wildcard ../flexdll/Makefile)" ""
     CAMLOPT := OCAML_FLEXLINK="../boot/ocamlrun ../flexdll/flexlink.exe" \

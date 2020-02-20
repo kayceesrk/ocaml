@@ -28,7 +28,7 @@ endif
 
 CAMLC=$(CAMLRUN) ../boot/ocamlc -strict-sequence -nostdlib -I ../boot \
       -use-prims ../byterun/primitives
-CAMLOPT=$(CAMLRUN) ../ocamlopt -nostdlib -I ../stdlib
+CAMLOPT=$(CAMLRUN) ../ocamlopt -nostdlib -I ../stdlib -I ../byterun -I ../asmrun
 COMPFLAGS=$(INCLUDES) -absname -w +a-4-9-41-42-44-45-48 -warn-error A \
           -safe-string -strict-sequence -strict-formats -bin-annot
 LINKFLAGS=
