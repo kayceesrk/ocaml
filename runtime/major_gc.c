@@ -150,6 +150,24 @@ static void realloc_gray_vals (void)
 
 #ifdef NATIVE_CODE_AND_NO_NAKED_POINTERS
 
+#ifdef _WIN32
+#include <windows.h>
+
+static inline int safe_load(volatile value* p, value* result)
+{
+  value v;
+  __try {
+    v = *p;
+  }
+  __except(GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ?
+        EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+    *result = 0xdeadbeef;
+    return 0;
+  }
+  *result = v;
+  return 1;
+}
+#else
 static inline int safe_load (header_t * addr, /*out*/ header_t * contents)
 {
   int ok;
@@ -171,6 +189,13 @@ static inline int safe_load (header_t * addr, /*out*/ header_t * contents)
   *contents = h;
   return ok;
 }
+#endif
+
+#if SIZEOF_LONG == SIZEOF_PTR
+#define VAL_ONE 1ul
+#else
+#define VAL_ONE 1ull
+#endif
 
 static int is_pointer_safe (value v, value *p)
 {
@@ -189,7 +214,7 @@ static int is_pointer_safe (value v, value *p)
   /* For the pointer to be considered safe, either the given pointer is in heap
    * or the (out of heap) pointer has a black header and its size is < 2 ** 40
    * words (128 GB). If not, we report a warning. */
-  if (Is_in_heap (v) || (Is_black_hd(h) && Wosize_hd(h) < (1ul << 40)))
+  if (Is_in_heap (v) || (Is_black_hd(h) && Wosize_hd(h) < (VAL_ONE << 40)))
     return 1;
 
   if (!Is_black_hd(h)) {
