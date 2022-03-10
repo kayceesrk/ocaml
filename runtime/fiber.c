@@ -98,24 +98,27 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize)
 #endif /* USE_MMAP_MAP_STACK */
 }
 
-Caml_inline struct stack_info** stack_cache_bucket (mlsize_t wosize) {
-  mlsize_t size_bucket_wsz = caml_fiber_wsz;
-  struct stack_info** size_bucket = Caml_state->stack_cache;
-  struct stack_info** end = size_bucket + NUM_STACK_SIZE_CLASSES;
+/* Returns the index into the [Caml_state->stack_cache] array if this size is
+   pooled. If unpooled, it is [-1].
 
-  /* wosize is in stack cache bucket n iff wosize == caml_fiber_wsz * 2**n */
-  while (size_bucket < end) {
+   Stacks may be unpooled if either the stack size is not 2**N multiple of
+   [caml_fiber_wsz] or the stack is bigger than pooled sizes. */
+Caml_inline int stack_cache_bucket (mlsize_t wosize) {
+  mlsize_t size_bucket_wsz = caml_fiber_wsz;
+  int size_bucket = 0;
+
+  while (size_bucket < NUM_STACK_SIZE_CLASSES) {
     if (wosize == size_bucket_wsz)
       return size_bucket;
     ++size_bucket;
     size_bucket_wsz += size_bucket_wsz;
   }
 
-  return NULL;
+  return -1;
 }
 
 static struct stack_info*
-alloc_size_class_stack_noexc(mlsize_t wosize, struct stack_info** size_bucket,
+alloc_size_class_stack_noexc(mlsize_t wosize, int size_bucket,
                              value hval, value hexn, value heff)
 {
   struct stack_info* stack;
@@ -124,10 +127,10 @@ alloc_size_class_stack_noexc(mlsize_t wosize, struct stack_info** size_bucket,
   CAML_STATIC_ASSERT(sizeof(struct stack_info) % sizeof(value) == 0);
   CAML_STATIC_ASSERT(sizeof(struct stack_handler) % sizeof(value) == 0);
 
-  if (size_bucket != NULL && *size_bucket != NULL) {
-    stack = *size_bucket;
-    *size_bucket = (struct stack_info*)stack->exception_ptr;
-    CAMLassert(stack->size_bucket == stack_cache_bucket(wosize));
+  if (size_bucket != -1 && Caml_state->stack_cache[size_bucket] != NULL) {
+    stack = Caml_state->stack_cache[size_bucket];
+    Caml_state->stack_cache[size_bucket] =
+      (struct stack_info*)stack->exception_ptr;
     hand = stack->handler;
   } else {
     /* couldn't get a cached stack, so have to create one */
@@ -164,15 +167,15 @@ alloc_size_class_stack_noexc(mlsize_t wosize, struct stack_info** size_bucket,
 static struct stack_info* alloc_stack_noexc(mlsize_t wosize, value hval,
                                             value hexn, value heff)
 {
-  struct stack_info** size_bucket = stack_cache_bucket (wosize);
-  return alloc_size_class_stack_noexc(wosize, size_bucket, hval, hexn, heff);
+  int bucket = stack_cache_bucket (wosize);
+  return alloc_size_class_stack_noexc(wosize, bucket, hval, hexn, heff);
 }
 
 #ifdef NATIVE_CODE
 
 value caml_alloc_stack (value hval, value hexn, value heff) {
   struct stack_info* stack =
-    alloc_size_class_stack_noexc(caml_fiber_wsz, Caml_state->stack_cache,
+    alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff);
 
   if (!stack) caml_raise_out_of_memory();
@@ -294,7 +297,7 @@ CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
 {
   value* sp;
   struct stack_info* stack =
-    alloc_size_class_stack_noexc(caml_fiber_wsz, Caml_state->stack_cache,
+    alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff);
 
   if (!stack) caml_raise_out_of_memory();
@@ -468,9 +471,9 @@ void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
   CAMLassert(stack->magic == 42);
-  if (stack->size_bucket != NULL) {
-    stack->exception_ptr = (void*)(*stack->size_bucket);
-    *stack->size_bucket = stack;
+  if (stack->size_bucket != -1) {
+    stack->exception_ptr = (value*)Caml_state->stack_cache[stack->size_bucket];
+    Caml_state->stack_cache[stack->size_bucket] = stack;
 #ifdef DEBUG
     memset(Stack_base(stack), 0x42,
            (Stack_high(stack)-Stack_base(stack))*sizeof(value));
