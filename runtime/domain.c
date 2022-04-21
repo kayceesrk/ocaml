@@ -1103,9 +1103,16 @@ static void* domain_thread_func(void* v)
     caml_domain_set_name("Domain");
     caml_callback(ml_values->callback, Val_unit);
     domain_terminate();
+
     /* Joining domains will lock/unlock the terminate_mutex so this unlock will
        release them if any domains are waiting. */
     caml_mutex_unlock(terminate_mutex);
+
+    /* [ml_values] must be freed after unlocking [terminate_mutex] to ensure
+       that [ml_values->mutex] is only removed from the root set after the
+       mutex is unlocked. Otherwise, there is the risk of [terimate_mutex]
+       destroyed by [caml_mutex_finalize] finaliser while it is locked, leading
+       to undefined behaviour. */
     free_domain_ml_values(ml_values);
   } else {
     caml_gc_log("Failed to create domain");
@@ -1662,6 +1669,9 @@ static void domain_terminate (void)
   caml_domain_state* domain_state = domain_self->state;
   struct interruptor* s = &domain_self->interruptor;
   int finished = 0;
+#ifndef _WIN32
+  sigset_t mask;
+#endif
 
   caml_gc_log("Domain terminating");
   s->terminating = 1;
@@ -1753,6 +1763,12 @@ static void domain_terminate (void)
   atomic_store_rel(&domain_self->backup_thread_msg, BT_TERMINATE);
   caml_plat_signal(&domain_self->domain_cond);
   caml_plat_unlock(&domain_self->domain_lock);
+
+#ifndef _WIN32
+  /* Block all signals so that signal handlers do not run on this thread */
+  sigfillset(&mask);
+  pthread_sigmask(SIG_BLOCK, &mask, NULL);
+#endif
 
   caml_plat_assert_all_locks_unlocked();
   /* This is the last thing we do because we need to be able to rely
