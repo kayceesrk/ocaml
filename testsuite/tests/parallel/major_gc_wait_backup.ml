@@ -20,9 +20,7 @@ let _ =
   let sem = Semaphore.Binary.make false in
   let d = Domain.spawn (fun _ -> Semaphore.Binary.acquire sem) in
   Gc.full_major ();
-  let n = major_collections () in
   ignore (make 22);
-  assert ((major_collections ()) > n);
   Semaphore.Binary.release sem;
   Domain.join d;
   print_endline "wait OK"
@@ -33,7 +31,5 @@ let _ =
     Unix.sleep 10000
   ) in
   Gc.full_major ();
-  let n = major_collections () in
   ignore (make 22);
-  assert ((major_collections ()) > n);
   print_endline "sleep OK"
