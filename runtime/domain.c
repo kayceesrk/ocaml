@@ -482,7 +482,7 @@ static int allocate_minor_heap(asize_t wsize) {
   domain_state->young_end =
       (value*)(domain_self->minor_heap_area_start + Bsize_wsize(wsize));
   domain_state->young_ptr = domain_state->young_end;
-  caml_reset_young_limit(domain_state);
+  caml_reset_young_limit(domain_state, domain_state->young_start);
 
   check_minor_heap();
   return 0;
@@ -672,7 +672,7 @@ static void create_domain(uintnat initial_minor_heap_wsize) {
   domain_state->trap_barrier_off = 0;
 #endif
 
-  caml_reset_young_limit(domain_state);
+  caml_reset_young_limit(domain_state, domain_state->young_start);
 
   add_to_stw_domains(domain_self);
   goto domain_init_complete;
@@ -1466,11 +1466,11 @@ void caml_interrupt_self(void) {
   interrupt_domain(&domain_self->interruptor);
 }
 
-void caml_reset_young_limit(caml_domain_state * dom_st)
+void caml_reset_young_limit(caml_domain_state* dom_st, value* young_trigger)
 {
   /* An interrupt might have been queued in the meanwhile; this
      achieves the proper synchronisation. */
-  atomic_exchange(&dom_st->young_limit, (uintnat)dom_st->young_start);
+  atomic_exchange(&dom_st->young_limit, (uintnat)young_trigger);
   dom_internal * d = &all_domains[dom_st->id];
   if (atomic_load_relaxed(&d->interruptor.interrupt_pending)
       || dom_st->requested_minor_gc
@@ -1486,25 +1486,37 @@ void caml_poll_gc_work(void)
 {
   CAMLalloc_point_here;
 
-  if (((uintnat)Caml_state->young_ptr - Bhsize_wosize(Max_young_wosize) <
-       (uintnat)Caml_state->young_start) ||
-      Caml_state->requested_minor_gc) {
-    /* out of minor heap or collection forced */
-    Caml_state->requested_minor_gc = 0;
-    caml_empty_minor_heaps_once();
+  caml_domain_state* d = Caml_state;
+  value* young_trigger = d->young_start;
+  value* young_mid = d->young_start + (d->young_end - d->young_start) / 2;
+
+  if ((uintnat)d->young_ptr - Bhsize_wosize(Max_young_wosize) <
+      (uintnat)d->young_start) {
+    d->requested_minor_gc = 1;
+  } else if ((uintnat)d->young_ptr - Bhsize_wosize(Max_young_wosize) <
+             (uintnat)young_mid) {
+    d->requested_major_slice = 1;
   }
 
-  if (Caml_state->requested_major_slice) {
+  if (d->requested_minor_gc) {
+    /* out of minor heap or collection forced */
+    d->requested_minor_gc = 0;
+    caml_empty_minor_heaps_once();
+    /* Setup to trigger major slice when the minor heap is half full */
+    young_trigger = young_mid;
+  }
+
+  if (d->requested_major_slice) {
     CAML_EV_BEGIN(EV_MAJOR);
-    Caml_state->requested_major_slice = 0;
+    d->requested_major_slice = 0;
     caml_major_collection_slice(AUTO_TRIGGERED_MAJOR_SLICE);
     CAML_EV_END(EV_MAJOR);
   }
 
-  if (atomic_load_acq(&Caml_state->requested_external_interrupt)) {
+  if (atomic_load_acq(&d->requested_external_interrupt)) {
     caml_domain_external_interrupt_hook();
   }
-  caml_reset_young_limit(Caml_state);
+  caml_reset_young_limit(d, young_trigger);
 }
 
 void caml_handle_gc_interrupt(void)

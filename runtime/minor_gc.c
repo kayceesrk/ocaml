@@ -623,7 +623,7 @@ void caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
 
   domain->young_ptr = domain->young_end;
-  caml_reset_young_limit(domain);
+  caml_reset_young_limit(domain, domain->young_start);
 
   if( participating_count > 1 ) {
     atomic_fetch_add_explicit
@@ -725,9 +725,6 @@ static void caml_stw_empty_minor_heap (caml_domain_state* domain, void* unused,
 {
   caml_stw_empty_minor_heap_no_major_slice(domain, unused,
                                             participating_count, participating);
-
-  /* schedule a major collection slice for this domain */
-  caml_request_major_slice();
 
   /* can change how we account clock in future, here just do raw count */
   domain->major_gc_clock += 1.0;
