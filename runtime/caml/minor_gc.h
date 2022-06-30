@@ -38,6 +38,7 @@
   asize_t reserve;             \
 }
 
+CAMLextern atomic_uintnat caml_stat_minor_collections;
 struct caml_ref_table CAML_TABLE_STRUCT(value *);
 
 struct caml_ephe_ref_elt {

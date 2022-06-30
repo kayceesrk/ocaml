@@ -134,7 +134,6 @@ DOMAIN_STATE(struct caml_intern_state*, intern_state)
 DOMAIN_STATE(uintnat, stat_minor_words)
 DOMAIN_STATE(uintnat, stat_promoted_words)
 DOMAIN_STATE(uintnat, stat_major_words)
-DOMAIN_STATE(intnat, stat_minor_collections)
 DOMAIN_STATE(intnat, stat_forced_major_collections)
 DOMAIN_STATE(uintnat, stat_blocks_marked)
 
