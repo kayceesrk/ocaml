@@ -42,7 +42,9 @@
 
 extern value caml_ephe_none; /* See weak.c */
 struct generic_table CAML_TABLE_STRUCT(char);
+
 CAMLexport atomic_uintnat caml_stat_minor_collections;
+CAMLexport atomic_uintnat caml_major_slice_epoch;
 
 static atomic_intnat domains_finished_minor_gc;
 
@@ -631,6 +633,10 @@ void caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
 
   domain->young_ptr = domain->young_end;
+  /* Trigger a GC poll when half of the minor heap is filled. At that point, a
+   * major slice is scheduled. */
+  domain->young_trigger = domain->young_start
+    + (domain->young_end - domain->young_start) / 2;
   caml_reset_young_limit(domain);
 
   if( participating_count > 1 ) {
@@ -735,9 +741,6 @@ static void caml_stw_empty_minor_heap (caml_domain_state* domain, void* unused,
 {
   caml_stw_empty_minor_heap_no_major_slice(domain, unused,
                                            participating_count, participating);
-
-  /* schedule a major collection slice for this domain */
-  caml_request_major_slice();
 
   /* can change how we account clock in future, here just do raw count */
   domain->major_gc_clock += 1.0;
