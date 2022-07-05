@@ -39,10 +39,10 @@
 }
 
 /* Count of the total number of minor collections performed by the program */
-CAMLextern atomic_uintnat caml_stat_minor_collections;
+CAMLextern atomic_uintnat caml_minor_collections_count;
 
 /* The epoch number for major slice. Used to trigger major slices.
-   Always, [caml_major_slice_epoch <= caml_stat_minor_collections] */
+   Always, [caml_major_slice_epoch <= caml_minor_collections_count] */
 CAMLextern atomic_uintnat caml_major_slice_epoch;
 
 struct caml_ref_table CAML_TABLE_STRUCT(value *);

@@ -1490,6 +1490,45 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
   }
 }
 
+Caml_inline void advance_global_major_slice_epoch (caml_domain_state* d)
+{
+  uintnat old_value;
+
+  CAMLassert (atomic_load (&caml_major_slice_epoch) <=
+              atomic_load (&caml_minor_collections_count));
+
+  old_value = atomic_exchange (&caml_major_slice_epoch,
+                               atomic_load (&caml_minor_collections_count));
+
+  if (old_value != atomic_load (&caml_minor_collections_count)) {
+    /* This domain is the first one to use up half of its minor heap arena
+        in this minor cycle. Trigger major slice on other domains. */
+    if (caml_plat_try_lock(&all_domains_lock)) {
+      /* Note that this interrupt is best-effort. If we get the lock,
+          then interrupt all the domains. If not, either some other domain
+          is calling for a stop-the-world section interrupting all the
+          domains, or a domain is being created or terminated. All of these
+          actions also try to lock [all_domains_lock] mutex, and the above
+          lock acquisition may fail.
+
+          If we don't get the lock, we don't interrupt other domains. This
+          is acceptable since it does not affect safety but only liveness --
+          the speed of the major gc. The other domains may themselves fill
+          half of their minor heap triggering a major slice, or do it right
+          after their next minor GC when they observe that their
+          domain-local [Caml_state->major_slice_epoch] is less than the
+          global one [caml_major_slice_epoch]. */
+      for(int i = 0; i < stw_domains.participating_domains; i++) {
+        dom_internal * di = stw_domains.domains[i];
+        stw_request.participating[i] = di->state;
+        CAMLassert(!di->interruptor.interrupt_pending);
+        if (di->state != d) interrupt_domain(&di->interruptor);
+      }
+      caml_plat_unlock (&all_domains_lock);
+    }
+  }
+}
+
 void caml_poll_gc_work(void)
 {
   CAMLalloc_point_here;
@@ -1507,44 +1546,16 @@ void caml_poll_gc_work(void)
                   d->young_start + (d->young_end - d->young_start) / 2);
       /* We have used half of our minor heap arena. Request a major slice on
          this domain. */
-      d->requested_major_slice = 1;
-
-      uintnat old_value =
-        atomic_exchange (&caml_major_slice_epoch,
-        atomic_load (&caml_stat_minor_collections));
-      if (old_value != atomic_load (&caml_stat_minor_collections)) {
-        /* This domain is the first one to use up half of its minor heap arena
-           in this minor cycle. Trigger major slice on other domains. */
-        if (caml_plat_try_lock(&all_domains_lock)) {
-          /* Note that this interrupt is best-effort. If we get the lock,
-             then interrupt all the domains. If not, either some other domain
-             is calling for a stop-the-world section interrupting all the
-             domains, or a domain is being created or terminated. All of these
-             actions also try to lock [all_domains_lock] mutex, and the above
-             lock acquisition may fail.
-
-             If we don't get the lock, we don't interrupt other domains. This
-             is acceptable since it does not affect safety but only liveness --
-             the speed of the major gc. The other domains may themselves fill
-             half of their minor heap triggering a major slice, or do it right
-             after their next minor GC when they observe that their
-             domain-local [Caml_state->major_slice_epoch] is less than the
-             global one [caml_major_slice_epoch]. */
-          for(int i = 0; i < stw_domains.participating_domains; i++) {
-            dom_internal * di = stw_domains.domains[i];
-            stw_request.participating[i] = di->state;
-            CAMLassert(!di->interruptor.interrupt_pending);
-            if (di->state != d) interrupt_domain(&di->interruptor);
-          }
-          caml_plat_unlock (&all_domains_lock);
-        }
-      }
+      advance_global_major_slice_epoch (d);
     }
+  } else if (d->requested_minor_gc) {
+    /* This domain has _not_ used up half of its minor heap arena, but a minor
+       collection has been requested. Schedule a major collection slice so as
+       to not lag behind. */
+    advance_global_major_slice_epoch (d);
   }
 
   if (d->major_slice_epoch < atomic_load (&caml_major_slice_epoch)) {
-    /* Some other domain used by half of its minor heap arena. Request a major
-       slice. */
     d->requested_major_slice = 1;
   }
 

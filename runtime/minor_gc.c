@@ -43,7 +43,7 @@
 extern value caml_ephe_none; /* See weak.c */
 struct generic_table CAML_TABLE_STRUCT(char);
 
-CAMLexport atomic_uintnat caml_stat_minor_collections;
+CAMLexport atomic_uintnat caml_minor_collections_count;
 CAMLexport atomic_uintnat caml_major_slice_epoch;
 
 static atomic_intnat domains_finished_minor_gc;
@@ -679,7 +679,7 @@ void caml_do_opportunistic_major_slice
 void caml_empty_minor_heap_setup(caml_domain_state* domain_unused) {
   atomic_store_explicit(&domains_finished_minor_gc, 0, memory_order_release);
   /* Increment the total number of minor collections done in the program */
-  atomic_fetch_add (&caml_stat_minor_collections, 1);
+  atomic_fetch_add (&caml_minor_collections_count, 1);
 }
 
 /* must be called within a STW section */
