@@ -101,7 +101,6 @@ and ident_undefined_recursive_module =
         ident_create "Undefined_recursive_module"
 and ident_continuation_already_taken =
         ident_create "Continuation_already_taken"
-and ident_unhandled = ident_create "Unhandled"
 and ident_unhandled_effect = ident_create "Unhandled_effect"
 
 let all_predef_exns = [
@@ -118,7 +117,6 @@ let all_predef_exns = [
   ident_assert_failure;
   ident_undefined_recursive_module;
   ident_continuation_already_taken;
-  ident_unhandled;
   ident_unhandled_effect;
 ]
 
@@ -189,12 +187,12 @@ let build_initial_env add_type add_extension empty_env =
     in
     add_type type_ident decl env
   in
-  let add_extension id l =
+  let add_extension ?(use_gadt=false) id l =
     add_extension id
       { ext_type_path = path_exn;
         ext_type_params = [];
         ext_args = Cstr_tuple l;
-        ext_ret_type = None;
+        ext_ret_type = if use_gadt then Some type_exn else None;
         ext_private = Asttypes.Public;
         ext_loc = Location.none;
         ext_attributes = [Ast_helper.Attr.mk
@@ -260,8 +258,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_extension ident_sys_error [type_string]
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[type_string; type_int; type_int])]
-  |> add_extension ident_unhandled []
-  |> add_extension ident_unhandled_effect [type_eff (newgenty (Tvar None))]
+  |> add_extension ~use_gadt:true ident_unhandled_effect [type_eff (newgenty (Tvar None))]
 
 let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns

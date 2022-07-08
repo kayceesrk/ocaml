@@ -901,8 +901,10 @@ LBL(112):
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
     /* No parent stack. Raise Unhandled. */
-        LEA_VAR(caml_exn_Unhandled, %rax)
-        jmp LBL(caml_raise_exn)
+        LEA_VAR(caml_exn_Unhandled_effect, %rdi)
+        movq    %rax, %rsi
+        LEA_VAR(caml_raise_with_arg, %rax)
+        jmp     LBL(caml_c_call)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_perform))
 

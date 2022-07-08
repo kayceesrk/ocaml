@@ -8,7 +8,7 @@ open Effect.Deep
 
 let num_domains = 2
 
-type _ Effect.t += Fork : (unit -> unit) -> unit Effect.t
+type _ t += Fork : (unit -> unit) -> unit t
 
 let fork f = perform (Fork f)
 
@@ -37,7 +37,7 @@ let run =
             print_string (Printexc.to_string e);
             dequeue ());
         effc =
-          (fun (type a) (e : a Effect.t) ->
+          (fun (type a) (e : a t) ->
             match e with
             | Fork f ->
                 Some

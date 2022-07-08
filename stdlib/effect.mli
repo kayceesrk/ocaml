@@ -16,7 +16,7 @@
 
     @since 5.0 *)
 
-type _ t = ..
+type 'a t = 'a eff = ..
 (** The type of effects. *)
 
 external perform : 'a t -> 'a = "%perform"

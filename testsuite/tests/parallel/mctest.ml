@@ -192,18 +192,18 @@ struct
               match f k with
                 | None -> dequeue ()
                 | Some v -> continue k v)
-        | Resume (t, v) -> Some (fun (k : (a, _) continuation) ->
-            enqueue k;
-            continue t v)
-        | GetTid -> Some (fun (k : (a, _) continuation) ->
-            continue k pid)
-        | Spawn f -> Some (fun (k : (a, _) continuation) ->
-            enqueue k;
-            exec f)
-        | Yield -> Some (fun (k : (a, _) continuation) ->
-            enqueue k;
-            dequeue ())
-        | _ -> None }
+          | Resume (t, v) -> Some (fun (k : (a, _) continuation) ->
+              enqueue k;
+              continue t v)
+          | GetTid -> Some (fun (k : (a, _) continuation) ->
+              continue k pid)
+          | Spawn f -> Some (fun (k : (a, _) continuation) ->
+              enqueue k;
+              exec f)
+          | Yield -> Some (fun (k : (a, _) continuation) ->
+              enqueue k;
+              dequeue ())
+          | _ -> None }
 
   let num_threads = 2
 

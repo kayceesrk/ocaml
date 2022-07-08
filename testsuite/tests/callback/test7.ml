@@ -31,7 +31,7 @@ let _ =
     printf "[Caml] Call caml_to_c\n%!";
     begin try
       caml_to_c ()
-    with Unhandled ->
+    with Unhandled_effect E ->
       (printf "[Caml] Caught Unhandled, perform effect\n%!";
        perform E)
     end;
