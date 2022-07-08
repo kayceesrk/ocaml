@@ -25,6 +25,7 @@ val type_float: type_expr
 val type_bool: type_expr
 val type_unit: type_expr
 val type_exn: type_expr
+val type_eff: type_expr
 val type_array: type_expr -> type_expr
 val type_list: type_expr -> type_expr
 val type_option: type_expr -> type_expr
@@ -32,8 +33,8 @@ val type_nativeint: type_expr
 val type_int32: type_expr
 val type_int64: type_expr
 val type_lazy_t: type_expr -> type_expr
-val type_extension_constructor:type_expr
-val type_floatarray:type_expr
+val type_extension_constructor: type_expr
+val type_floatarray: type_expr
 
 val path_int: Path.t
 val path_char: Path.t

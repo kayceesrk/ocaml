@@ -152,6 +152,7 @@ let init () =
   (* Enter the predefined exceptions *)
   Array.iteri
     (fun i name ->
+      Printf.printf "name=%s\n" name;
       let id =
         try List.assoc name Predef.builtin_values
         with Not_found -> fatal_error "Symtable.init" in
