@@ -1505,23 +1505,21 @@ Caml_inline void advance_global_major_slice_epoch (caml_domain_state* d)
         in this minor cycle. Trigger major slice on other domains. */
     if (caml_plat_try_lock(&all_domains_lock)) {
       /* Note that this interrupt is best-effort. If we get the lock,
-          then interrupt all the domains. If not, either some other domain
-          is calling for a stop-the-world section interrupting all the
-          domains, or a domain is being created or terminated. All of these
-          actions also try to lock [all_domains_lock] mutex, and the above
-          lock acquisition may fail.
+         then interrupt all the domains. If not, either some other domain
+         is calling for a stop-the-world section interrupting all the
+         domains, or a domain is being created or terminated. All of these
+         actions also try to lock [all_domains_lock] mutex, and the above
+         lock acquisition may fail.
 
-          If we don't get the lock, we don't interrupt other domains. This
-          is acceptable since it does not affect safety but only liveness --
-          the speed of the major gc. The other domains may themselves fill
-          half of their minor heap triggering a major slice, or do it right
-          after their next minor GC when they observe that their
-          domain-local [Caml_state->major_slice_epoch] is less than the
-          global one [caml_major_slice_epoch]. */
+         If we don't get the lock, we don't interrupt other domains. This is
+         acceptable since it does not affect safety but only liveness -- the
+         speed of the major gc. The other domains may themselves fill half of
+         their minor heap triggering a major slice, or will certainly do a
+         major slice right after their next minor GC when they observe that
+         their domain-local [Caml_state->major_slice_epoch] is less than the
+         global one [caml_major_slice_epoch]. */
       for(int i = 0; i < stw_domains.participating_domains; i++) {
         dom_internal * di = stw_domains.domains[i];
-        stw_request.participating[i] = di->state;
-        CAMLassert(!di->interruptor.interrupt_pending);
         if (di->state != d) interrupt_domain(&di->interruptor);
       }
       caml_plat_unlock (&all_domains_lock);
