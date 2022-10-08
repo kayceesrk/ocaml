@@ -70,6 +70,7 @@ void caml_reset_young_limit(caml_domain_state *);
 
 CAMLextern void caml_reset_domain_lock(void);
 CAMLextern int caml_bt_is_in_blocking_section(void);
+CAMLextern int caml_bt_is_self(void);
 CAMLextern intnat caml_domain_is_multicore (void);
 CAMLextern void caml_bt_enter_ocaml(void);
 CAMLextern void caml_bt_exit_ocaml(void);
@@ -78,6 +79,7 @@ CAMLextern void caml_release_domain_lock(void);
 
 /* These hooks are not modified after other domains are spawned. */
 CAMLextern void (*caml_atfork_hook)(void);
+CAMLextern void (*caml_domain_initialize_hook)(void);
 CAMLextern void (*caml_domain_stop_hook)(void);
 CAMLextern void (*caml_domain_external_interrupt_hook)(void);
 
@@ -87,8 +89,6 @@ CAMLextern void caml_init_domain_self(int);
 CAMLextern uintnat caml_minor_heap_max_wsz;
 
 CAMLextern atomic_uintnat caml_num_domains_running;
-CAMLextern uintnat caml_minor_heaps_start;
-CAMLextern uintnat caml_minor_heaps_end;
 
 Caml_inline intnat caml_domain_alone(void)
 {

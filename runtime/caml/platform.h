@@ -72,9 +72,9 @@ Caml_inline void atomic_store_relaxed(atomic_uintnat* p, uintnat v)
 
 #define Max_spins 1000
 
-unsigned caml_plat_spin_wait(unsigned spins,
-                             const char* file, int line,
-                             const char* function);
+CAMLextern unsigned caml_plat_spin_wait(unsigned spins,
+                                        const char* file, int line,
+                                        const char* function);
 
 #define GENSYM_3(name, l) name##l
 #define GENSYM_2(name, l) GENSYM_3(name, l)
@@ -134,10 +134,10 @@ void caml_mem_unmap(void* mem, uintnat size);
 
 
 CAMLnoreturn_start
-void caml_plat_fatal_error(char * action, int err)
+void caml_plat_fatal_error(const char * action, int err)
 CAMLnoreturn_end;
 
-Caml_inline void check_err(char* action, int err)
+Caml_inline void check_err(const char* action, int err)
 {
   if (err) caml_plat_fatal_error(action, err);
 }

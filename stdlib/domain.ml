@@ -25,6 +25,8 @@ module Raw = struct
     = "caml_ml_domain_id"
   external cpu_relax : unit -> unit
     = "caml_ml_domain_cpu_relax"
+  external get_recommended_domain_count: unit -> int
+    = "caml_recommended_domain_count" [@@noalloc]
 end
 
 let cpu_relax () = Raw.cpu_relax ()
@@ -146,7 +148,7 @@ let first_spawn_function = ref (fun () -> ())
 
 let before_first_spawn f =
   if Atomic.get first_domain_spawned then
-    raise (Invalid_argument "First domain already spawned")
+    raise (Invalid_argument "first domain already spawned")
   else begin
     let old_f = !first_spawn_function in
     let new_f () = old_f (); f () in
@@ -180,25 +182,6 @@ let do_at_exit () =
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit
 
-let startup_function = Atomic.make (fun () -> ())
-
-let rec at_each_spawn f =
-  let old_startup = Atomic.get startup_function in
-  let new_startup () =
-    (* The domain creation callbacks ([at_each_spawn]) are run in
-       first-in-first-out (FIFO) order in order to be symmetric with the domain
-       termination callbacks ([at_exit]) which run in last-in-fisrt-out (LIFO)
-       order. *)
-    old_startup (); f ()
-  in
-  let success =
-    Atomic.compare_and_set startup_function old_startup new_startup
-  in
-  if success then
-    ()
-  else
-    at_each_spawn f
-
 (******* Creation and Termination ********)
 
 let spawn f =
@@ -211,13 +194,11 @@ let spawn f =
   let term_condition = Condition.create () in
   let term_state = ref Running in
 
-  let at_each_spawn = Atomic.get startup_function in
   let body () =
     let result =
       match
         DLS.create_dls ();
         DLS.set_initial_keys pk;
-        at_each_spawn ();
         let res = f () in
         res
       with
@@ -275,3 +256,5 @@ let join { term_mutex; term_condition; term_state; _ } =
   match loop () with
   | Ok x -> x
   | Error ex -> raise ex
+
+let recommended_domain_count = Raw.get_recommended_domain_count

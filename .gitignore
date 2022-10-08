@@ -37,6 +37,7 @@ _ocamltestd
 *.odoc
 .merlin
 _build
+META
 
 # local to root directory
 
@@ -62,6 +63,7 @@ _build
 # specific files and patterns in sub-directories
 
 /asmcomp/emit.ml
+/asmcomp/arch.mli
 /asmcomp/arch.ml
 /asmcomp/proc.ml
 /asmcomp/selection.ml
@@ -81,6 +83,7 @@ _build
 /debugger/debugger_lexer.ml
 /debugger/debugger_parser.ml
 /debugger/debugger_parser.mli
+/debugger/debugger_parser.output
 /debugger/ocamldebug
 
 /emacs/ocamltags
@@ -130,6 +133,7 @@ _build
 /ocamltest/tsl_lexer.ml
 /ocamltest/tsl_parser.ml
 /ocamltest/tsl_parser.mli
+/ocamltest/tsl_parser.output
 /ocamltest/ocamltest.html
 
 /otherlibs/*/.dep
@@ -200,6 +204,7 @@ _build
 /testsuite/tools/lexcmm.ml
 /testsuite/tools/parsecmm.ml
 /testsuite/tools/parsecmm.mli
+/testsuite/tools/parsecmm.output
 
 /tools/ocamldep
 /tools/ocamldep.opt
@@ -234,7 +239,7 @@ _build
 /tools/stripdebug.opt
 /tools/make_opcodes
 /tools/make_opcodes.ml
-/tools/caml-tex
+/tools/ocamltex
 /tools/eventlog_metadata
 
 /toplevel/byte/topeval.mli
@@ -244,7 +249,11 @@ _build
 /toplevel/native/trace.mli
 /toplevel/native/topmain.mli
 
-/utils/config_*.ml*
+/utils/config_boot.ml
+/utils/config_boot.mli
+/utils/config.generated.ml
+/utils/config_main.ml
+/utils/config_main.mli
 /utils/config.ml
 /utils/domainstate.ml
 /utils/domainstate.mli

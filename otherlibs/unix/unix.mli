@@ -681,7 +681,7 @@ val fchown : file_descr -> int -> int -> unit
 
     @raise Invalid_argument on Windows *)
 
-val umask : int -> int
+val umask : file_perm -> file_perm
 (** Set the process's file mode creation mask, and return the previous
     mask.
 
@@ -995,11 +995,11 @@ val close_process_full :
 val symlink : ?to_dir: (* thwart tools/sync_stdlib_docs *) bool ->
               string -> string -> unit
 (** [symlink ?to_dir src dst] creates the file [dst] as a symbolic link
-   to the file [src]. On Windows, [to_dir] indicates if the symbolic link
+   to the file [src]. On Windows, [~to_dir] indicates if the symbolic link
    points to a directory or a file; if omitted, [symlink] examines [src]
    using [stat] and picks appropriately, if [src] does not exist then [false]
-   is assumed (for this reason, it is recommended that the [to_dir] parameter
-   be specified in new code). On Unix, [to_dir] is ignored.
+   is assumed (for this reason, it is recommended that the [~to_dir] parameter
+   be specified in new code). On Unix, [~to_dir] is ignored.
 
    Windows symbolic links are available in Windows Vista onwards. There are some
    important differences between Windows symlinks and their POSIX counterparts.
@@ -1449,9 +1449,7 @@ val socketpair :
     file_descr * file_descr
 (** Create a pair of unnamed sockets, connected together.
    See {!set_close_on_exec} for documentation on the [cloexec]
-   optional argument.
-
-   @raise Invalid_argument on Windows *)
+   optional argument. *)
 
 val accept : ?cloexec: (* thwart tools/sync_stdlib_docs *) bool ->
              file_descr -> file_descr * sockaddr

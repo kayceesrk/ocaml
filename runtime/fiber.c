@@ -21,6 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "caml/alloc.h"
+#include "caml/callback.h"
 #include "caml/codefrag.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
@@ -185,9 +186,9 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
 }
 
 /* allocate a stack with at least "wosize" usable words of stack */
-static struct stack_info*
-alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff,
-                  int64_t id)
+struct stack_info*
+caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff,
+                       int64_t id)
 {
   int cache_bucket = stack_cache_bucket (wosize);
   return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
@@ -308,8 +309,8 @@ void caml_maybe_expand_stack (void)
       caml_raise_stack_overflow();
 
   if (Caml_state->gc_regs_buckets == NULL) {
-    /* ensure there is at least one gc_regs bucket available before
-       running any OCaml code */
+    /* Ensure there is at least one gc_regs bucket available before
+       running any OCaml code. See fiber.h for documentation. */
     value* bucket = caml_stat_alloc(sizeof(value) * Wosize_gc_regs);
     bucket[0] = 0; /* no next bucket */
     Caml_state->gc_regs_buckets = bucket;
@@ -404,9 +405,8 @@ void caml_scan_stack(
 
 #ifdef NATIVE_CODE
 /* Update absolute exception pointers for new stack*/
-static void
-rewrite_exception_stack(struct stack_info *old_stack,
-                        value** exn_ptr, struct stack_info *new_stack)
+void caml_rewrite_exception_stack(struct stack_info *old_stack,
+                                  value** exn_ptr, struct stack_info *new_stack)
 {
   fiber_debug_log("Old [%p, %p]", Stack_base(old_stack), Stack_high(old_stack));
   fiber_debug_log("New [%p, %p]", Stack_base(new_stack), Stack_high(new_stack));
@@ -432,6 +432,61 @@ rewrite_exception_stack(struct stack_info *old_stack,
     fiber_debug_log ("exn_ptr is null");
   }
 }
+
+#ifdef WITH_FRAME_POINTERS
+/* Update absolute base pointers for new stack */
+static void rewrite_frame_pointers(struct stack_info *old_stack,
+    struct stack_info *new_stack)
+{
+  struct frame_walker {
+    struct frame_walker *base_addr;
+    uintnat return_addr;
+  } *frame, *next;
+  ssize_t delta;
+  void *top, **p;
+
+  delta = (char*)Stack_high(new_stack) - (char*)Stack_high(old_stack);
+
+  /* Walk the frame-pointers linked list */
+  for (frame = __builtin_frame_address(0); frame; frame = next) {
+
+    top = (char*)&frame->return_addr
+      + 1 * sizeof(value) /* return address */
+      + 2 * sizeof(value) /* trap frame */
+      + 2 * sizeof(value); /* DWARF pointer & gc_regs */
+
+    /* Detect top of the fiber and bail out */
+    /* It also avoid to dereference invalid base pointer at main */
+    if (top == Stack_high(old_stack))
+      break;
+
+    /* Save the base address since it may be adjusted */
+    next = frame->base_addr;
+
+    if (!(Stack_base(old_stack) <= (value*)frame->base_addr
+        && (value*)frame->base_addr < Stack_high(old_stack))) {
+      /* No need to adjust base pointers that don't point into the reallocated
+       * fiber */
+      continue;
+    }
+
+    if (Stack_base(old_stack) <= (value*)&frame->base_addr
+        && (value*)&frame->base_addr < Stack_high(old_stack)) {
+      /* The base pointer itself is located inside the reallocated fiber
+       * and needs to be adjusted on the new fiber */
+      p = (void**)((char*)Stack_high(new_stack) - (char*)Stack_high(old_stack)
+          + (char*)&frame->base_addr);
+      CAMLassert(*p == frame->base_addr);
+      *p += delta;
+    }
+    else {
+      /* Base pointers on other stacks are adjusted in place */
+      frame->base_addr = (struct frame_walker*)((char*)frame->base_addr
+          + delta);
+    }
+  }
+}
+#endif
 #endif
 
 int caml_try_realloc_stack(asize_t required_space)
@@ -459,11 +514,12 @@ int caml_try_realloc_stack(asize_t required_space)
                  (uintnat) wsize * sizeof(value));
   }
 
-  new_stack = alloc_stack_noexc(wsize,
-                                Stack_handle_value(old_stack),
-                                Stack_handle_exception(old_stack),
-                                Stack_handle_effect(old_stack),
-                                old_stack->id);
+  new_stack = caml_alloc_stack_noexc(wsize,
+                                     Stack_handle_value(old_stack),
+                                     Stack_handle_exception(old_stack),
+                                     Stack_handle_effect(old_stack),
+                                     old_stack->id);
+
   if (!new_stack) return 0;
   memcpy(Stack_high(new_stack) - stack_used,
          Stack_high(old_stack) - stack_used,
@@ -471,8 +527,11 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->sp = Stack_high(new_stack) - stack_used;
   Stack_parent(new_stack) = Stack_parent(old_stack);
 #ifdef NATIVE_CODE
-  rewrite_exception_stack(old_stack, (value**)&Caml_state->exn_handler,
-                          new_stack);
+  caml_rewrite_exception_stack(old_stack, (value**)&Caml_state->exn_handler,
+                              new_stack);
+#ifdef WITH_FRAME_POINTERS
+  rewrite_frame_pointers(old_stack, new_stack);
+#endif
 #endif
 
   /* Update stack pointers in Caml_state->c_stack. It is possible to have
@@ -498,7 +557,7 @@ struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stk =
-    alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
+    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
   return stk;
 }
 
@@ -528,6 +587,16 @@ void caml_free_stack (struct stack_info* stack)
 #endif
   }
 }
+
+void caml_free_gc_regs_buckets(value *gc_regs_buckets)
+{
+  while (gc_regs_buckets != NULL) {
+    value *next = (value*)gc_regs_buckets[0];
+    caml_stat_free(gc_regs_buckets);
+    gc_regs_buckets = next;
+  }
+}
+
 
 CAMLprim value caml_continuation_use_noexc (value cont)
 {
@@ -562,7 +631,7 @@ CAMLprim value caml_continuation_use (value cont)
 {
   value v = caml_continuation_use_noexc(cont);
   if (v == Val_ptr(NULL))
-    caml_raise_continuation_already_taken();
+    caml_raise_continuation_already_resumed();
   return v;
 }
 
@@ -598,4 +667,48 @@ CAMLprim value caml_drop_continuation (value cont)
   struct stack_info* stk = Ptr_val(caml_continuation_use(cont));
   caml_free_stack(stk);
   return Val_unit;
+}
+
+static const value * _Atomic caml_unhandled_effect_exn = NULL;
+static const value * _Atomic caml_continuation_already_resumed_exn = NULL;
+
+static const value * cache_named_exception(const value * _Atomic * cache,
+                                           const char * name)
+{
+  const value * exn;
+  exn = atomic_load_explicit(cache, memory_order_acquire);
+  if (exn == NULL) {
+    exn = caml_named_value(name);
+    if (exn == NULL) {
+      fprintf(stderr, "Fatal error: exception %s\n", name);
+      exit(2);
+    }
+    atomic_store_explicit(cache, exn, memory_order_release);
+  }
+  return exn;
+}
+
+CAMLexport void caml_raise_continuation_already_resumed(void)
+{
+  const value * exn =
+    cache_named_exception(&caml_continuation_already_resumed_exn,
+                          "Effect.Continuation_already_resumed");
+  caml_raise(*exn);
+}
+
+value caml_make_unhandled_effect_exn (value effect)
+{
+  CAMLparam1(effect);
+  value res;
+  const value * exn =
+    cache_named_exception(&caml_unhandled_effect_exn, "Effect.Unhandled");
+  res = caml_alloc_small(2,0);
+  Field(res, 0) = *exn;
+  Field(res, 1) = effect;
+  CAMLreturn(res);
+}
+
+CAMLexport void caml_raise_unhandled_effect (value effect)
+{
+  caml_raise(caml_make_unhandled_effect_exn(effect));
 }

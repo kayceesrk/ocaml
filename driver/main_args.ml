@@ -425,6 +425,10 @@ let mk_safe_string =
   "-safe-string", Arg.Unit (fun () -> ()),
   " (default unconditionally since 5.0)"
 
+let mk_safer_matching f =
+  "-safer-matching", Arg.Unit f,
+  " Do not use type information to optimize pattern-matching"
+
 let mk_shared f =
   "-shared", Arg.Unit f, " Produce a dynlinkable plugin"
 
@@ -572,7 +576,7 @@ let mk_nopervasives f =
 
 let mk_match_context_rows f =
   "-match-context-rows", Arg.Int f,
-  let[@manual.ref "s:comp-options"] chapter, section = 11, 2 in
+  let[@manual.ref "s:comp-options"] chapter, section = 13, 2 in
   Printf.sprintf
   "<n>  (advanced, see manual section %d.%d.)" chapter section
 
@@ -705,7 +709,7 @@ let mk_opaque f =
 
 let mk_strict_formats f =
   "-strict-formats", Arg.Unit f,
-  " Reject invalid formats accepted by legacy implementations\n\
+  " Reject invalid formats accepted by legacy implementations (default)\n\
   \     (Warning: Invalid formats may behave differently from\n\
   \      previous OCaml versions, and will become always-rejected\n\
   \      in future OCaml versions. You should always use this flag\n\
@@ -713,7 +717,7 @@ let mk_strict_formats f =
 
 let mk_no_strict_formats f =
   "-no-strict-formats", Arg.Unit f,
-  " Accept invalid formats accepted by legacy implementations (default)\n\
+  " Accept invalid formats accepted by legacy implementations\n\
   \     (Warning: Invalid formats may behave differently from\n\
   \      previous OCaml versions, and will become always-rejected\n\
   \      in future OCaml versions. You should never use this flag\n\
@@ -760,6 +764,7 @@ module type Common_options = sig
   val _no_principal : unit -> unit
   val _rectypes : unit -> unit
   val _no_rectypes : unit -> unit
+  val _safer_matching : unit -> unit
   val _short_paths : unit -> unit
   val _strict_sequence : unit -> unit
   val _no_strict_sequence : unit -> unit
@@ -1055,6 +1060,7 @@ struct
     mk_with_runtime F._with_runtime;
     mk_without_runtime F._without_runtime;
     mk_safe_string;
+    mk_safer_matching F._safer_matching;
     mk_short_paths F._short_paths;
     mk_strict_sequence F._strict_sequence;
     mk_no_strict_sequence F._no_strict_sequence;
@@ -1131,6 +1137,7 @@ struct
     mk_rectypes F._rectypes;
     mk_no_rectypes F._no_rectypes;
     mk_safe_string;
+    mk_safer_matching F._safer_matching;
     mk_short_paths F._short_paths;
     mk_stdin F._stdin;
     mk_strict_sequence F._strict_sequence;
@@ -1260,6 +1267,7 @@ struct
     mk_without_runtime F._without_runtime;
     mk_S F._S;
     mk_safe_string;
+    mk_safer_matching F._safer_matching;
     mk_shared F._shared;
     mk_short_paths F._short_paths;
     mk_strict_sequence F._strict_sequence;
@@ -1380,6 +1388,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_remove_unused_arguments F._remove_unused_arguments;
     mk_S F._S;
     mk_safe_string;
+    mk_safer_matching F._safer_matching;
     mk_short_paths F._short_paths;
     mk_stdin F._stdin;
     mk_strict_sequence F._strict_sequence;
@@ -1554,6 +1563,7 @@ module Default = struct
     let _open s = open_modules := (s :: (!open_modules))
     let _principal = set principal
     let _rectypes = set recursive_types
+    let _safer_matching = set safer_matching
     let _short_paths = clear real_paths
     let _strict_formats = set strict_formats
     let _strict_sequence = set strict_sequence

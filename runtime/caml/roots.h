@@ -25,10 +25,13 @@ typedef enum {
   SCANNING_ONLY_YOUNG_VALUES = 1, // action is a no-op outside the minor heap
 } scanning_action_flags;
 
-typedef void (*scanning_action) (void*, value, value *);
+typedef void (*scanning_action) (void*, value, volatile value *);
 typedef void (*scan_roots_hook) (scanning_action, scanning_action_flags,
                                  void*, caml_domain_state*);
+
+#ifndef __cplusplus
 CAMLextern _Atomic scan_roots_hook caml_scan_roots_hook;
+#endif
 
 CAMLextern void caml_do_roots (
   scanning_action f, scanning_action_flags,

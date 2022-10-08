@@ -681,7 +681,7 @@ val fchown : file_descr -> uid:int -> gid:int -> unit
 
     @raise Invalid_argument on Windows *)
 
-val umask : int -> int
+val umask : file_perm -> file_perm
 (** Set the process's file mode creation mask, and return the previous
     mask.
 
@@ -1449,9 +1449,7 @@ val socketpair :
     file_descr * file_descr
 (** Create a pair of unnamed sockets, connected together.
    See {!set_close_on_exec} for documentation on the [cloexec]
-   optional argument.
-
-   @raise Invalid_argument on Windows *)
+   optional argument. *)
 
 val accept : ?cloexec: (* thwart tools/sync_stdlib_docs *) bool ->
              file_descr -> file_descr * sockaddr

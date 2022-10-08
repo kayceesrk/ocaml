@@ -421,7 +421,7 @@ module MakeSeeded(H: SeededHashedType): (SeededS with type key = H.t) =
                   if H.equal key k3 then Some d3 else find_rec_opt key next3
 
     let find_all h key =
-      let rec find_in_bucket = function
+      let[@tail_mod_cons] rec find_in_bucket = function
       | Empty ->
           []
       | Cons{key=k; data=d; next} ->
@@ -447,13 +447,14 @@ module MakeSeeded(H: SeededHashedType): (SeededS with type key = H.t) =
         if h.size > Array.length h.data lsl 1 then resize key_index h
       end
 
-    let mem h key =
-      let rec mem_in_bucket = function
+    let rec mem_in_bucket key = function
       | Empty ->
           false
       | Cons{key=k; next} ->
-          H.equal k key || mem_in_bucket next in
-      mem_in_bucket h.data.(key_index h key)
+          H.equal k key || mem_in_bucket key next
+
+    let mem h key =
+      mem_in_bucket key h.data.(key_index h key)
 
     let add_seq tbl i =
       Seq.iter (fun (k,v) -> add tbl k v) i
@@ -571,7 +572,7 @@ let find_opt h key =
               if compare key k3 = 0 then Some d3 else find_rec_opt key next3
 
 let find_all h key =
-  let rec find_in_bucket = function
+  let[@tail_mod_cons] rec find_in_bucket = function
   | Empty ->
       []
   | Cons{key=k; data; next} ->
@@ -597,13 +598,14 @@ let replace h key data =
     if h.size > Array.length h.data lsl 1 then resize key_index h
   end
 
-let mem h key =
-  let rec mem_in_bucket = function
+let rec mem_in_bucket key = function
   | Empty ->
       false
   | Cons{key=k; next} ->
-      compare k key = 0 || mem_in_bucket next in
-  mem_in_bucket h.data.(key_index h key)
+      compare k key = 0 || mem_in_bucket key next
+
+let mem h key =
+  mem_in_bucket key h.data.(key_index h key)
 
 let add_seq tbl i =
   Seq.iter (fun (k,v) -> add tbl k v) i

@@ -49,8 +49,8 @@ CAMLextern value caml_alloc_shr_preserving_profinfo (mlsize_t, tag_t,
 CAMLextern void caml_adjust_gc_speed (mlsize_t, mlsize_t);
 CAMLextern void caml_alloc_dependent_memory (mlsize_t bsz);
 CAMLextern void caml_free_dependent_memory (mlsize_t bsz);
-CAMLextern void caml_modify (value *, value);
-CAMLextern void caml_initialize (value *, value);
+CAMLextern void caml_modify (volatile value *, value);
+CAMLextern void caml_initialize (volatile value *, value);
 CAMLextern int caml_atomic_cas_field (value, intnat, value, value);
 CAMLextern value caml_check_urgent_gc (value);
 #ifdef CAML_INTERNALS
@@ -237,6 +237,14 @@ struct caml__roots_block {
 
 #define CAML_LOCAL_ROOTS (Caml_state->local_roots)
 
+/* Emit a call to `Caml_check_caml_state`, but only for user
+   programs. */
+#ifdef CAML_INTERNALS
+#define DO_CHECK_CAML_STATE 0
+#else
+#define DO_CHECK_CAML_STATE 1
+#endif
+
 /* The following macros are used to declare C local variables and
    function parameters of type [value].
 
@@ -268,8 +276,10 @@ struct caml__roots_block {
    union tags, macros, etc.)
 */
 
-#define CAMLparam0() \
-  struct caml__roots_block** caml_local_roots_ptr = &CAML_LOCAL_ROOTS;\
+#define CAMLparam0()                                                    \
+  struct caml__roots_block** caml_local_roots_ptr =                     \
+    (DO_CHECK_CAML_STATE ? Caml_check_caml_state() : (void)0,           \
+     &CAML_LOCAL_ROOTS);                                                \
   struct caml__roots_block *caml__frame = *caml_local_roots_ptr
 
 #define CAMLparam1(x) \

@@ -135,13 +135,13 @@
 #endif
 
 #if defined(FUNCTION_SECTIONS)
-        TEXT_SECTION(caml_hot__code_begin)
-        .globl  G(caml_hot__code_begin)
-G(caml_hot__code_begin):
+        TEXT_SECTION(caml_hot.code_begin)
+        .globl  G(caml_hot.code_begin)
+G(caml_hot.code_begin):
 
-        TEXT_SECTION(caml_hot__code_end)
-        .globl  G(caml_hot__code_end)
-G(caml_hot__code_end):
+        TEXT_SECTION(caml_hot.code_end)
+        .globl  G(caml_hot.code_end)
+G(caml_hot.code_end):
 #endif
 
 #if defined(SYS_macosx)
@@ -771,15 +771,15 @@ L(do_perform):
         mov     x3, TMP                /* x3 := effect handler */
         b       G(caml_apply3)
 1:
-    /*  switch back to original performer before raising Unhandled
+    /*  switch back to original performer before raising Effect.Unhandled
         (no-op unless this is a reperform) */
         ldr     x10, [x1] /* load performer stack from continuation */
         sub     x10, x10, 1 /* x10 := Ptr_val(x10) */
         ldr     x9, Caml_state(current_stack)
         SWITCH_OCAML_STACKS x9, x10
-    /*  No parent stack. Raise Unhandled. */
-        ADDRGLOBAL(x0, caml_exn_Unhandled)
-        b       G(caml_raise_exn)
+    /*  No parent stack. Raise Effect.Unhandled. */
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_unhandled_effect)
+        b       G(caml_c_call)
         CFI_ENDPROC
         END_FUNCTION(caml_perform)
 
@@ -816,8 +816,8 @@ CFI_STARTPROC
         SWITCH_OCAML_STACKS x9, x0
         mov     x0, x2
         br      x3
-2:      ADDRGLOBAL(x0, caml_exn_Continuation_already_taken)
-        b       G(caml_raise_exn)
+2:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+        b       G(caml_c_call)
         CFI_ENDPROC
         END_FUNCTION(caml_resume)
 
@@ -909,8 +909,8 @@ L(fiber_exn_handler):
 
 FUNCTION(caml_ml_array_bound_error)
         CFI_STARTPROC
-    /* Load address of [caml_array_bound_error] in ADDITIONAL_ARG */
-        ADDRGLOBAL(ADDITIONAL_ARG, caml_array_bound_error)
+    /* Load address of [caml_array_bound_error_asm] in ADDITIONAL_ARG */
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_array_bound_error_asm)
     /* Call that function */
         b       G(caml_c_call)
         CFI_ENDPROC
@@ -922,7 +922,7 @@ G(caml_system__code_end):
 
 /* GC roots for callback */
 
-OBJECT(caml_system__frametable)
+OBJECT(caml_system.frametable)
         .quad   2               /* two descriptors */
         .quad   L(caml_retaddr) /* return address into callback */
         .short  -1              /* negative frame size => use callback link */
@@ -932,7 +932,7 @@ OBJECT(caml_system__frametable)
         .short  -1              /* negative frame size => use callback link */
         .short  0               /* no roots here */
         .align 3
-        END_OBJECT(caml_system__frametable)
+        END_OBJECT(caml_system.frametable)
 
 #if !defined(SYS_macosx)
 /* Mark stack as non-executable */

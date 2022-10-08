@@ -18,13 +18,31 @@
 
 #define CAML_INTERNALS
 
+#define _GNU_SOURCE  /* For sched.h CPU_ZERO(3) and CPU_COUNT(3) */
+#include "caml/config.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
+#ifdef HAS_GNU_GETAFFINITY_NP
+#include <sched.h>
+#ifdef HAS_PTHREAD_NP_H
+#include <pthread_np.h>
+#endif
+#endif
+#ifdef HAS_BSD_GETAFFINITY_NP
+#include <pthread_np.h>
+#include <sys/cpuset.h>
+typedef cpuset_t cpu_set_t;
+#endif
+#ifdef _WIN32
+#include <sysinfoapi.h>
+#endif
 #include "caml/alloc.h"
 #include "caml/backtrace.h"
+#include "caml/backtrace_prim.h"
 #include "caml/callback.h"
+#include "caml/debugger.h"
 #include "caml/domain.h"
 #include "caml/domain_state.h"
 #include "caml/runtime_events.h"
@@ -391,7 +409,7 @@ asize_t caml_norm_minor_heap_size (intnat wsize)
 
   This is done below in
     [caml_reallocate_minor_heap]
-  which is called both at domain-initialization (by [create_domain])
+  which is called both at domain-initialization (by [domain_create])
   and if a request comes to change the minor heap size.
 
   The boundaries of this committed memory area are
@@ -524,7 +542,7 @@ static uintnat fresh_domain_unique_id(void) {
 }
 
 /* must be run on the domain's thread */
-static void create_domain(uintnat initial_minor_heap_wsize) {
+static void domain_create(uintnat initial_minor_heap_wsize) {
   dom_internal* d = 0;
   caml_domain_state* domain_state;
   struct interruptor* s;
@@ -593,10 +611,6 @@ static void create_domain(uintnat initial_minor_heap_wsize) {
 
   domain_state->dependent_size = 0;
   domain_state->dependent_allocated = 0;
-
-  if (caml_init_signal_stack() < 0) {
-    goto init_signal_stack_failure;
-  }
 
   /* the minor heap will be initialized by
      [caml_reallocate_minor_heap] below. */
@@ -677,10 +691,10 @@ static void create_domain(uintnat initial_minor_heap_wsize) {
   domain_state->external_raise = NULL;
   domain_state->trap_sp_off = 1;
   domain_state->trap_barrier_off = 0;
+  domain_state->trap_barrier_block = -1;
 #endif
 
   caml_reset_young_limit(domain_state);
-
   add_to_stw_domains(domain_self);
   goto domain_init_complete;
 
@@ -695,8 +709,6 @@ init_shared_heap_failure:
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = NULL;
 alloc_minor_tables_failure:
-  caml_free_signal_stack();
-init_signal_stack_failure:
   domain_self = NULL;
 
 
@@ -874,7 +886,7 @@ void caml_init_domains(uintnat minor_heap_wsz) {
     dom->backup_thread_msg = BT_INIT;
   }
 
-  create_domain(minor_heap_wsz);
+  domain_create(minor_heap_wsz);
   if (!domain_self) caml_fatal_error("Failed to create main domain");
   CAMLassert (domain_self->state->unique_id == 0);
 
@@ -1024,6 +1036,11 @@ static void install_backup_thread (dom_internal* di)
   }
 }
 
+static void caml_domain_initialize_default(void)
+{
+  return;
+}
+
 static void caml_domain_stop_default(void)
 {
   return;
@@ -1033,6 +1050,9 @@ static void caml_domain_external_interrupt_hook_default(void)
 {
   return;
 }
+
+CAMLexport void (*caml_domain_initialize_hook)(void) =
+   caml_domain_initialize_default;
 
 CAMLexport void (*caml_domain_stop_hook)(void) =
    caml_domain_stop_default;
@@ -1051,9 +1071,15 @@ static void* domain_thread_func(void* v)
   struct domain_ml_values *ml_values = p->ml_values;
 #ifndef _WIN32
   sigset_t mask = *(p->mask);
+  void * signal_stack;
+
+  signal_stack = caml_init_signal_stack();
+  if (signal_stack == NULL) {
+    caml_fatal_error("Failed to create domain: signal stack");
+  }
 #endif
 
-  create_domain(caml_params->init_minor_heap_wsz);
+  domain_create(caml_params->init_minor_heap_wsz);
   /* this domain is now part of the STW participant set */
   p->newdom = domain_self;
 
@@ -1080,6 +1106,7 @@ static void* domain_thread_func(void* v)
     caml_gc_log("Domain starting (unique_id = %"ARCH_INTNAT_PRINTF_FORMAT"u)",
                 domain_self->interruptor.unique_id);
     CAML_EV_LIFECYCLE(EV_DOMAIN_SPAWN, getpid());
+    caml_domain_initialize_hook();
     caml_callback(ml_values->callback, Val_unit);
     domain_terminate();
 
@@ -1098,6 +1125,9 @@ static void* domain_thread_func(void* v)
   } else {
     caml_gc_log("Failed to create domain");
   }
+#ifndef _WIN32
+  caml_free_signal_stack(signal_stack);
+#endif
   return 0;
 }
 
@@ -1111,6 +1141,10 @@ CAMLprim value caml_domain_spawn(value callback, value mutex)
   sigset_t mask, old_mask;
 #endif
 
+#ifndef NATIVE_CODE
+  if (caml_debugger_in_use)
+    caml_fatal_error("ocamldebug does not support spawning multiple domains");
+#endif
   p.parent = &domain_self->interruptor;
   p.status = Dom_starting;
 
@@ -1301,8 +1335,8 @@ int caml_domain_is_in_stw(void) {
      returns 0, the STW section did not run at all, so you should call
      this function in a loop.)
 
-   - Domain initialization code from [create_domain] will not run in
-     parallel with a STW section, as [create_domain] starts by
+   - Domain initialization code from [domain_create] will not run in
+     parallel with a STW section, as [domain_create] starts by
      looping until (1) it has the [all_domains_lock] and (2) there is
      no current STW section (using the [stw_leader] variable).
 
@@ -1327,13 +1361,13 @@ int caml_domain_is_in_stw(void) {
    but additional synchronization would be required to update it
    during domain cleanup.
 
-   Note: in the case of both [create_domain] and [domain_terminate] it
+   Note: in the case of both [domain_create] and [domain_terminate] it
    is important that the loops (waiting for STW sections to finish)
    regularly release [all_domains_lock], to avoid deadlocks scenario
    with in-progress STW sections.
     - For [domain_terminate] we release the lock and join
       the STW section before resuming.
-    - For [create_domain] we wait until the end of the section using
+    - For [domain_create] we wait until the end of the section using
       the condition variable [all_domains_cond] over
       [all_domains_lock], which is broadcasted when a STW section
       finishes.
@@ -1592,13 +1626,13 @@ void caml_handle_gc_interrupt(void)
 
 CAMLexport int caml_bt_is_in_blocking_section(void)
 {
-  dom_internal* self = domain_self;
-  uintnat status = atomic_load_acq(&self->backup_thread_msg);
-  if (status == BT_IN_BLOCKING_SECTION)
-    return 1;
-  else
-    return 0;
+  uintnat status = atomic_load_acq(&domain_self->backup_thread_msg);
+  return status == BT_IN_BLOCKING_SECTION;
+}
 
+CAMLexport int caml_bt_is_self(void)
+{
+  return pthread_equal(domain_self->backup_thread, pthread_self());
 }
 
 CAMLexport intnat caml_domain_is_multicore (void)
@@ -1611,6 +1645,7 @@ CAMLexport void caml_acquire_domain_lock(void)
 {
   dom_internal* self = domain_self;
   caml_plat_lock(&self->domain_lock);
+  SET_Caml_state(self->state);
 }
 
 CAMLexport void caml_bt_enter_ocaml(void)
@@ -1627,6 +1662,7 @@ CAMLexport void caml_bt_enter_ocaml(void)
 CAMLexport void caml_release_domain_lock(void)
 {
   dom_internal* self = domain_self;
+  SET_Caml_state(NULL);
   caml_plat_unlock(&self->domain_lock);
 }
 
@@ -1775,7 +1811,6 @@ static void domain_terminate (void)
   domain_state->shared_heap = 0;
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = 0;
-  caml_free_signal_stack();
 
   caml_orphan_alloc_stats(domain_state);
   /* Heap stats were orphaned by caml_teardown_shared_heap above.
@@ -1786,9 +1821,12 @@ static void domain_terminate (void)
      sample at this point as the shared heap is gone. */
   caml_clear_gc_stats_sample(domain_state);
 
+  /* TODO: can this ever be NULL? can we remove this check? */
   if(domain_state->current_stack != NULL) {
     caml_free_stack(domain_state->current_stack);
   }
+  caml_free_backtrace_buffer(domain_state->backtrace_buffer);
+  caml_free_gc_regs_buckets(domain_state->gc_regs_buckets);
 
   /* signal the domain termination to the backup thread
      NB: for a program with no additional domains, the backup thread
@@ -1822,4 +1860,37 @@ CAMLprim value caml_domain_dls_get(value unused)
 {
   CAMLnoalloc;
   return Caml_state->dls_root;
+}
+
+CAMLprim value caml_recommended_domain_count(value unused)
+{
+  intnat n = -1;
+
+#if defined(HAS_GNU_GETAFFINITY_NP) || defined(HAS_BSD_GETAFFINITY_NP)
+  cpu_set_t cpuset;
+
+  CPU_ZERO(&cpuset);
+  /* error case fallsback into next method */
+  if (pthread_getaffinity_np(pthread_self(), sizeof(cpuset), &cpuset) == 0)
+    n = CPU_COUNT(&cpuset);
+#endif /* HAS_GNU_GETAFFINITY_NP || HAS_BSD_GETAFFINITY_NP */
+
+#ifdef _SC_NPROCESSORS_ONLN
+  if (n == -1)
+    n = sysconf(_SC_NPROCESSORS_ONLN);
+#endif /* _SC_NPROCESSORS_ONLN */
+
+#ifdef _WIN32
+  SYSTEM_INFO sysinfo;
+  GetSystemInfo(&sysinfo);
+  n = sysinfo.dwNumberOfProcessors;
+#endif /* _WIN32 */
+
+  /* At least one, even if system says zero */
+  if (n <= 0)
+    n = 1;
+  else if (n > Max_domains)
+    n = Max_domains;
+
+  return (Val_long(n));
 }

@@ -540,6 +540,8 @@ CAMLexport void caml_main(char_os **argv)
   CAML_RUNTIME_EVENTS_INIT();
 
   Caml_state->external_raise = NULL;
+  /* Setup signal handling */
+  caml_init_signals();
   /* Initialize the interpreter */
   caml_interprete(NULL, 0);
   /* Initialize the debugger, if needed */
@@ -560,9 +562,7 @@ CAMLexport void caml_main(char_os **argv)
   /* Load the globals */
   caml_seek_section(fd, &trail, "DATA");
   chan = caml_open_descriptor_in(fd);
-  Lock(chan);
   value global_data = caml_input_val(chan);
-  Unlock(chan);
   caml_modify_generational_global_root(&caml_global_data, global_data);
   caml_close_channel(chan); /* this also closes fd */
   caml_stat_free(trail.section);
@@ -589,6 +589,7 @@ CAMLexport void caml_main(char_os **argv)
     }
     caml_fatal_uncaught_exception(exn);
   }
+  caml_terminate_signals();
 }
 
 /* Main entry point when code is linked in as initialized data */
@@ -601,6 +602,7 @@ CAMLexport value caml_startup_code_exn(
            char_os **argv)
 {
   char_os * exe_name;
+  value res;
 
   /* Initialize the domain */
   CAML_INIT_DOMAIN_STATE;
@@ -633,11 +635,10 @@ CAMLexport value caml_startup_code_exn(
 
   exe_name = caml_executable_name();
   if (exe_name == NULL) exe_name = caml_search_exe_in_path(argv[0]);
+
   Caml_state->external_raise = NULL;
-  caml_sys_init(exe_name, argv);
-  /* Load debugging info, if b>=2 */
-  caml_load_main_debug_info();
-  Caml_state->external_raise = NULL;
+  /* Setup signal handling */
+  caml_init_signals();
   /* Initialize the interpreter */
   caml_interprete(NULL, 0);
   /* Initialize the debugger, if needed */
@@ -655,16 +656,19 @@ CAMLexport value caml_startup_code_exn(
   /* Load the globals */
   caml_modify_generational_global_root
     (&caml_global_data, caml_input_value_from_block(data, data_size));
-  caml_minor_collection(); /* ensure all globals are in major heap */
-  /* Record the sections (for caml_get_section_table in meta.c) */
-  caml_init_section_table(section_table, section_table_size);
   /* Initialize system libraries */
   caml_sys_init(exe_name, argv);
   /* Load debugging info, if b>=2 */
   caml_load_main_debug_info();
+  /* ensure all globals are in major heap */
+  caml_minor_collection();
+  /* Record the sections (for caml_get_section_table in meta.c) */
+  caml_init_section_table(section_table, section_table_size);
   /* Execute the program */
   caml_debugger(PROGRAM_START, Val_unit);
-  return caml_interprete(caml_start_code, caml_code_size);
+  res = caml_interprete(caml_start_code, caml_code_size);
+  caml_terminate_signals();
+  return res;
 }
 
 CAMLexport void caml_startup_code(
