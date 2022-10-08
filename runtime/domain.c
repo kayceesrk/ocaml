@@ -1517,6 +1517,7 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
   if (atomic_load_relaxed(&d->interruptor.interrupt_pending)
       || dom_st->requested_minor_gc
       || dom_st->requested_major_slice
+      || dom_st->major_slice_epoch < atomic_load (&caml_major_slice_epoch)
       || atomic_load_relaxed(&dom_st->requested_external_interrupt)
       || dom_st->action_pending) {
     atomic_store_rel(&dom_st->young_limit, (uintnat)-1);
