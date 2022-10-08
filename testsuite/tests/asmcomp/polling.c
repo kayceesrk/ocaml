@@ -20,5 +20,5 @@ CAMLprim value request_minor_gc(value v) {
 }
 
 CAMLprim value minor_gcs(value v) {
-  return Val_long(atomic_load(&caml_stat_minor_collections));
+  return Val_long(atomic_load(&caml_minor_collections_count));
 }
