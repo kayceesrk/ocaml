@@ -142,5 +142,4 @@ module DLS : sig
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
-
 end

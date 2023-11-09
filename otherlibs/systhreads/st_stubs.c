@@ -74,7 +74,7 @@ struct caml_thread_struct {
   value descr;              /* The heap-allocated descriptor (root) */
   struct caml_thread_struct * next; /* Doubly-linked list of running threads */
   struct caml_thread_struct * prev;
-  value tls_state;    /* thread-local-storage */
+  value dls_state;    /* saved DLS value */
   int domain_id;      /* The id of the domain to which this thread belongs */
   struct stack_info* current_stack;      /* saved Caml_state->current_stack */
   struct c_stack_link* c_stack;          /* saved Caml_state->c_stack */
@@ -168,7 +168,7 @@ static void caml_thread_scan_roots(
   if (active != NULL) {
     do {
       (*action)(fdata, th->descr, &th->descr);
-      (*action)(fdata, th->tls_state, &th->tls_state);
+      (*action)(fdata, th->dls_state, &th->dls_state);
       (*action)(fdata, th->backtrace_last_exn, &th->backtrace_last_exn);
       /* Don't rescan the stack of the current thread, it was done already */
       if (th != active) {
@@ -194,6 +194,7 @@ static void save_runtime_state(void)
   CAMLassert(This_thread != NULL);
   caml_thread_t this_thread = This_thread;
   this_thread->current_stack = Caml_state->current_stack;
+  this_thread->dls_state = Caml_state->dls_root;
   this_thread->c_stack = Caml_state->c_stack;
   this_thread->gc_regs = Caml_state->gc_regs;
   this_thread->gc_regs_buckets = Caml_state->gc_regs_buckets;
@@ -214,6 +215,7 @@ static void restore_runtime_state(caml_thread_t th)
   CAMLassert(th != NULL);
   Active_thread = th;
   Caml_state->current_stack = th->current_stack;
+  Caml_state->dls_root = th->dls_state;
   Caml_state->c_stack = th->c_stack;
   Caml_state->gc_regs = th->gc_regs;
   Caml_state->gc_regs_buckets = th->gc_regs_buckets;
@@ -276,7 +278,7 @@ static caml_thread_t caml_thread_new_info(void)
   th = (caml_thread_t)caml_stat_alloc_noexc(sizeof(struct caml_thread_struct));
   if (th == NULL) return NULL;
   th->descr = Val_unit;
-  th->tls_state = Val_unit;
+  th->dls_state = Val_unit;
   th->next = NULL;
   th->prev = NULL;
   th->domain_id = domain_state->id;
@@ -308,7 +310,7 @@ void caml_thread_free_info(caml_thread_t th)
 {
   /* the following fields do not need any specific cleanup:
      descr: heap-allocated
-     tls_state: heap-allocated
+     dls_state: heap-allocated
      c_stack: stack-allocated
      local_roots: stack-allocated
      backtrace_last_exn: heap-allocated
@@ -460,7 +462,7 @@ static void caml_thread_domain_initialize_hook(void)
 
   new_thread->domain_id = Caml_state->id;
   new_thread->descr = caml_thread_new_descriptor(Val_unit);
-  new_thread->tls_state = Val_unit;
+  new_thread->dls_state = Val_unit;
   new_thread->next = new_thread;
   new_thread->prev = new_thread;
   new_thread->backtrace_last_exn = Val_unit;
@@ -634,7 +636,7 @@ CAMLprim value caml_thread_new(value clos)
 
   th->descr = caml_thread_new_descriptor(clos);
 
-  th->tls_state = Val_unit;
+  th->dls_state = Val_unit;
   th->next = Active_thread->next;
   th->prev = Active_thread;
 
@@ -722,21 +724,6 @@ CAMLexport int caml_c_thread_unregister(void)
 CAMLprim value caml_thread_self(value unit)
 {
   return Active_thread->descr;
-}
-
-/* Access thread-local-storage */
-CAMLprim value caml_thread_tls_get(value unused)
-{
-  CAMLnoalloc;
-  return Active_thread->tls_state;
-}
-
-/* Set thread-local-storage */
-CAMLprim value caml_thread_tls_set(value t)
-{
-  CAMLnoalloc;
-  Active_thread->tls_state = t;
-  return Val_unit;
 }
 
 /* Return the identifier of a thread */
