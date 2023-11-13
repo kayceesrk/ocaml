@@ -91,7 +91,7 @@ val recommended_domain_count : unit -> int
 
     The value returned is at least [1]. *)
 
-module DLS : sig
+module TLS : sig
 (** Domain-local Storage *)
 
     type 'a key
@@ -143,3 +143,6 @@ module DLS : sig
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
 end
+
+module DLS = TLS
+[@@deprecated "use TLS now"]

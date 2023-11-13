@@ -53,7 +53,7 @@ type 'a t = {
   term_sync : 'a Raw.term_sync;
 }
 
-module DLS = struct
+module TLS = struct
 
   type dls_state = Obj.t array
 
@@ -139,6 +139,8 @@ module DLS = struct
       l
 
 end
+
+module DLS = TLS
 
 (******** Identity **********)
 

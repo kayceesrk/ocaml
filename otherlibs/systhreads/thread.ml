@@ -49,9 +49,8 @@ exception Exit
 let create fn arg =
   thread_new
     (fun () ->
-      let dls: _ array = get_dls_state () in
-      let dls' = Array.copy dls in
-      set_dls_state dls';
+      let dls: Obj.t = Obj.repr [||] in
+      set_dls_state dls;
 
       try
         fn arg;

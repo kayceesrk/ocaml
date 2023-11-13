@@ -462,7 +462,7 @@ static void caml_thread_domain_initialize_hook(void)
 
   new_thread->domain_id = Caml_state->id;
   new_thread->descr = caml_thread_new_descriptor(Val_unit);
-  new_thread->dls_state = Val_unit;
+  new_thread->dls_state = Atom(0);
   new_thread->next = new_thread;
   new_thread->prev = new_thread;
   new_thread->backtrace_last_exn = Val_unit;
