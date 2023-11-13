@@ -338,37 +338,37 @@ let mk_default () =
            6388613595849772044L
 
 let random_key =
-  Domain.DLS.new_key ~split_from_parent:State.split mk_default
+  Domain.TLS.new_key ~split_from_parent:State.split mk_default
 
-let bits () = State.bits (Domain.DLS.get random_key)
-let int bound = State.int (Domain.DLS.get random_key) bound
-let full_int bound = State.full_int (Domain.DLS.get random_key) bound
+let bits () = State.bits (Domain.TLS.get random_key)
+let int bound = State.int (Domain.TLS.get random_key) bound
+let full_int bound = State.full_int (Domain.TLS.get random_key) bound
 let int_in_range ~min ~max =
-  State.int_in_range (Domain.DLS.get random_key) ~min ~max
-let int32 bound = State.int32 (Domain.DLS.get random_key) bound
+  State.int_in_range (Domain.TLS.get random_key) ~min ~max
+let int32 bound = State.int32 (Domain.TLS.get random_key) bound
 let int32_in_range ~min ~max =
-  State.int32_in_range (Domain.DLS.get random_key) ~min ~max
-let nativeint bound = State.nativeint (Domain.DLS.get random_key) bound
+  State.int32_in_range (Domain.TLS.get random_key) ~min ~max
+let nativeint bound = State.nativeint (Domain.TLS.get random_key) bound
 let nativeint_in_range ~min ~max =
-  State.nativeint_in_range (Domain.DLS.get random_key) ~min ~max
-let int64 bound = State.int64 (Domain.DLS.get random_key) bound
+  State.nativeint_in_range (Domain.TLS.get random_key) ~min ~max
+let int64 bound = State.int64 (Domain.TLS.get random_key) bound
 let int64_in_range ~min ~max =
-  State.int64_in_range (Domain.DLS.get random_key) ~min ~max
-let float scale = State.float (Domain.DLS.get random_key) scale
-let bool () = State.bool (Domain.DLS.get random_key)
-let bits32 () = State.bits32 (Domain.DLS.get random_key)
-let bits64 () = State.bits64 (Domain.DLS.get random_key)
-let nativebits () = State.nativebits (Domain.DLS.get random_key)
+  State.int64_in_range (Domain.TLS.get random_key) ~min ~max
+let float scale = State.float (Domain.TLS.get random_key) scale
+let bool () = State.bool (Domain.TLS.get random_key)
+let bits32 () = State.bits32 (Domain.TLS.get random_key)
+let bits64 () = State.bits64 (Domain.TLS.get random_key)
+let nativebits () = State.nativebits (Domain.TLS.get random_key)
 
-let full_init seed = State.reinit (Domain.DLS.get random_key) seed
+let full_init seed = State.reinit (Domain.TLS.get random_key) seed
 let init seed = full_init [| seed |]
 let self_init () = full_init (random_seed())
 
 (* Splitting *)
 
-let split () = State.split (Domain.DLS.get random_key)
+let split () = State.split (Domain.TLS.get random_key)
 
 (* Manipulating the current state. *)
 
-let get_state () = State.copy (Domain.DLS.get random_key)
-let set_state s = State.assign (Domain.DLS.get random_key) s
+let get_state () = State.copy (Domain.TLS.get random_key)
+let set_state s = State.assign (Domain.TLS.get random_key) s

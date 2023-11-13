@@ -174,17 +174,17 @@ let do_before_first_spawn () =
     first_spawn_function := (fun () -> ())
   end
 
-let at_exit_key = DLS.new_key (fun () -> (fun () -> ()))
+let at_exit_key = TLS.new_key (fun () -> (fun () -> ()))
 
 let at_exit f =
-  let old_exit : unit -> unit = DLS.get at_exit_key in
+  let old_exit : unit -> unit = TLS.get at_exit_key in
   let new_exit () =
     f (); old_exit ()
   in
-  DLS.set at_exit_key new_exit
+  TLS.set at_exit_key new_exit
 
 let do_at_exit () =
-  let f : unit -> unit = DLS.get at_exit_key in
+  let f : unit -> unit = TLS.get at_exit_key in
   f ()
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit
@@ -193,7 +193,7 @@ let _ = Stdlib.do_domain_local_at_exit := do_at_exit
 
 let spawn f =
   do_before_first_spawn ();
-  let pk = DLS.get_initial_keys () in
+  let pk = TLS.get_initial_keys () in
 
   (* [term_sync] is used to synchronize with the joining domains *)
   let term_sync =
@@ -204,8 +204,8 @@ let spawn f =
 
   let body () =
     match
-      DLS.create_dls ();
-      DLS.set_initial_keys pk;
+      TLS.create_dls ();
+      TLS.set_initial_keys pk;
       let res = f () in
       res
     with

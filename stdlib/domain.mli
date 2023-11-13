@@ -67,7 +67,7 @@ val at_exit : (unit -> unit) -> unit
     the function most recently added with [at_exit] is called first. An example:
 
     {[
-let temp_file_key = Domain.DLS.new_key (fun _ ->
+let temp_file_key = Domain.TLS.new_key (fun _ ->
   let tmp = snd (Filename.open_temp_file "" "") in
   Domain.at_exit (fun () -> close_out_noerr tmp);
   tmp)
@@ -95,7 +95,7 @@ module TLS : sig
 (** Domain-local Storage *)
 
     type 'a key
-    (** Type of a DLS key *)
+    (** Type of a TLS key *)
 
     val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
@@ -122,9 +122,9 @@ module TLS : sig
             ... child-side computation ...
           )
 
-        let key = Domain.DLS.new_key ~split_from_parent init
+        let key = Domain.TLS.new_key ~split_from_parent init
 
-        let get () = Lazy.force (Domain.DLS.get key)
+        let get () = Lazy.force (Domain.TLS.get key)
         ]}
 
         In this case a part of the computation happens on the child
@@ -142,6 +142,8 @@ module TLS : sig
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
+
+    val create_dls : unit -> unit
 end
 
 module DLS = TLS

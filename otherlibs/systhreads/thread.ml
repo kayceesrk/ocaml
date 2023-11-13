@@ -49,8 +49,7 @@ exception Exit
 let create fn arg =
   thread_new
     (fun () ->
-      let dls: Obj.t = Obj.repr [||] in
-      set_dls_state dls;
+      Domain.TLS.create_dls();
 
       try
         fn arg;
@@ -103,4 +102,4 @@ external sigmask : Unix.sigprocmask_command -> int list -> int list
 external wait_signal : int list -> int = "caml_wait_signal"
 
 
-module TLS = Domain.DLS
+module TLS = Domain.TLS
