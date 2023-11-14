@@ -143,7 +143,6 @@ module TLS : sig
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
 
-    val create_dls : unit -> unit
 end
 
 module DLS = TLS

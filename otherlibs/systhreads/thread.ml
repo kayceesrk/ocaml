@@ -49,7 +49,7 @@ exception Exit
 let create fn arg =
   thread_new
     (fun () ->
-      Domain.TLS.create_dls();
+      set_dls_state [||];
 
       try
         fn arg;
