@@ -28,11 +28,6 @@ external self : unit -> t = "caml_thread_self" [@@noalloc]
 external id : t -> int = "caml_thread_id" [@@noalloc]
 external join : t -> unit = "caml_thread_join"
 
-type dls_state = Obj.t array
-external get_dls_state : unit -> dls_state = "%tls_get"
-external set_dls_state : dls_state -> unit =
-  "caml_domain_tls_set" [@@noalloc]
-
 (* For new, make sure the function passed to thread_new never
    raises an exception. *)
 
@@ -47,11 +42,12 @@ let set_uncaught_exception_handler fn = uncaught_exception_handler := fn
 exception Exit
 
 let create fn arg =
+  let pk = CamlinternalTLS.get_initial_keys () in
   thread_new
     (fun () ->
-      set_dls_state [||];
 
       try
+        CamlinternalTLS.set_initial_keys pk;
         fn arg;
         ignore (Sys.opaque_identity (check_memprof_cb ()))
       with
