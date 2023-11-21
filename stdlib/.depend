@@ -176,13 +176,6 @@ camlinternalOO.cmx : \
     camlinternalOO.cmi
 camlinternalOO.cmi : \
     stdlib__Obj.cmi
-camlinternalTLS.cmi : \
-    stdlib__Sys.cmi \
-    stdlib__Obj.cmi \
-    stdlib__List.cmi \
-    stdlib__Atomic.cmi \
-    stdlib__Array.cmi \
-    camlinternalTLS.cmi
 camlinternalTLS.cmo : \
     stdlib__Sys.cmi \
     stdlib__Obj.cmi \
@@ -195,7 +188,10 @@ camlinternalTLS.cmx : \
     stdlib__Obj.cmx \
     stdlib__List.cmx \
     stdlib__Atomic.cmx \
-    stdlib__Array.cmx
+    stdlib__Array.cmx \
+    camlinternalTLS.cmi
+camlinternalTLS.cmi : \
+    stdlib__Obj.cmi
 stdlib__Char.cmo : char.ml \
     stdlib__Char.cmi
 stdlib__Char.cmx : char.ml \
@@ -232,7 +228,7 @@ stdlib__Domain.cmo : domain.ml \
     stdlib__Obj.cmi \
     stdlib__Mutex.cmi \
     stdlib__Condition.cmi \
-    camlinternalTLS.cmo \
+    camlinternalTLS.cmi \
     stdlib__Atomic.cmi \
     stdlib__Domain.cmi
 stdlib__Domain.cmx : domain.ml \
