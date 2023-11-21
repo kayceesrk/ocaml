@@ -372,7 +372,7 @@ let primitives_table =
     "%reperform", Primitive (Preperform, 3);
     "%perform", Primitive (Pperform, 1);
     "%resume", Primitive (Presume, 3);
-    "%tls_get", Primitive (Ptls_get, 1);
+    "%dls_get", Primitive (Ptls_get, 1);
   ]
 
 
