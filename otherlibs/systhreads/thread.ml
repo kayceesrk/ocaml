@@ -29,9 +29,9 @@ external id : t -> int = "caml_thread_id" [@@noalloc]
 external join : t -> unit = "caml_thread_join"
 
 type dls_state = Obj.t array
-external get_dls_state : unit -> dls_state = "%dls_get"
+external get_dls_state : unit -> dls_state = "%tls_get"
 external set_dls_state : dls_state -> unit =
-  "caml_domain_dls_set" [@@noalloc]
+  "caml_domain_tls_set" [@@noalloc]
 
 (* For new, make sure the function passed to thread_new never
    raises an exception. *)
