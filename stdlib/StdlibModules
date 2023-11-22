@@ -70,6 +70,7 @@ STDLIB_MODULE_BASENAMES = \
   mutex \
   condition \
   semaphore \
+  camlinternalTLS \
   domain \
   camlinternalFormat \
   printf \
