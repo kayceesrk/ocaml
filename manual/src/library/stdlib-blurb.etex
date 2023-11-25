@@ -106,6 +106,7 @@ be called from C \\
 \subsubsection*{sss:stdlib-multicore}{Multicore interface:}
 \begin{tabular}{lll}
 "Domain" & p.~\stdpageref{Domain} & domain spawn and join \\
+"Thread_local_storage" & p.~\stdpageref{Thread_local_storage} & thread-local storage \\
 "Mutex" & p.~\stdpageref{Mutex} & mutual exclusion locks \\
 "Condition" & p.~\stdpageref{Condition} & condition variables \\
 "Semaphore" & p.~\stdpageref{Semaphore} & semaphores \\
