@@ -71,6 +71,7 @@ STDLIB_MODULE_BASENAMES = \
   condition \
   semaphore \
   camlinternalTLS \
+  thread_local_storage \
   domain \
   camlinternalFormat \
   printf \

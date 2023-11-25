@@ -97,4 +97,4 @@ external sigmask : Unix.sigprocmask_command -> int list -> int list
 external wait_signal : int list -> int = "caml_wait_signal"
 
 
-module TLS = Domain.TLS
+module Local_storage = Thread_local_storage

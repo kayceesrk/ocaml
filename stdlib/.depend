@@ -224,22 +224,21 @@ stdlib__Digest.cmx : digest.ml \
     stdlib__Digest.cmi
 stdlib__Digest.cmi : digest.mli
 stdlib__Domain.cmo : domain.ml \
+    stdlib__Thread_local_storage.cmi \
     stdlib.cmi \
-    stdlib__Obj.cmi \
     stdlib__Mutex.cmi \
     stdlib__Condition.cmi \
-    camlinternalTLS.cmi \
     stdlib__Atomic.cmi \
     stdlib__Domain.cmi
 stdlib__Domain.cmx : domain.ml \
+    stdlib__Thread_local_storage.cmx \
     stdlib.cmx \
-    stdlib__Obj.cmx \
     stdlib__Mutex.cmx \
     stdlib__Condition.cmx \
-    camlinternalTLS.cmx \
     stdlib__Atomic.cmx \
     stdlib__Domain.cmi
-stdlib__Domain.cmi : domain.mli
+stdlib__Domain.cmi : domain.mli \
+    stdlib__Thread_local_storage.cmi
 stdlib__Dynarray.cmo : dynarray.ml \
     stdlib__Sys.cmi \
     stdlib__Seq.cmi \
@@ -794,6 +793,17 @@ stdlib__Sys.cmo : sys.ml \
 stdlib__Sys.cmx : sys.ml \
     stdlib__Sys.cmi
 stdlib__Sys.cmi : sys.mli
+stdlib__Thread_local_storage.cmo : thread_local_storage.ml \
+    stdlib__Obj.cmi \
+    camlinternalTLS.cmi \
+    stdlib__Atomic.cmi \
+    stdlib__Thread_local_storage.cmi
+stdlib__Thread_local_storage.cmx : thread_local_storage.ml \
+    stdlib__Obj.cmx \
+    camlinternalTLS.cmx \
+    stdlib__Atomic.cmx \
+    stdlib__Thread_local_storage.cmi
+stdlib__Thread_local_storage.cmi : thread_local_storage.mli
 stdlib__Type.cmo : type.ml \
     stdlib__Obj.cmi \
     stdlib__Type.cmi

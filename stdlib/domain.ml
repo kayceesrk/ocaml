@@ -53,35 +53,7 @@ type 'a t = {
   term_sync : 'a Raw.term_sync;
 }
 
-module TLS = struct
-  open CamlinternalTLS
-
-  type nonrec 'a key = 'a key
-
-  let key_counter = Atomic.make 0
-
-  type key_initializer = CamlinternalTLS.key_initializer =
-    KI: 'a key * ('a -> 'a) -> key_initializer
-
-  let new_key ?split_from_parent init_orphan =
-    let idx = Atomic.fetch_and_add key_counter 1 in
-    let k = (idx, init_orphan) in
-    begin match split_from_parent with
-    | None -> ()
-    | Some split -> add_parent_key (KI(k, split))
-    end;
-    k
-
-  let set = set
-
-  let get = get
-
-  let get_initial_keys : unit -> (int * Obj.t) list = get_initial_keys
-
-  let set_initial_keys : (int * Obj.t) list -> unit = set_initial_keys
-end
-
-module DLS = TLS
+module DLS = Thread_local_storage
 
 (******** Identity **********)
 

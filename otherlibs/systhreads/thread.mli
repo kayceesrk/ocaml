@@ -1,4 +1,4 @@
-(**************************************************************************)
+(**************************************************************************)thread
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
@@ -175,4 +175,4 @@ val set_uncaught_exception_handler : (exn -> unit) -> unit
 
 (** Thread local storage.
     @since 5.2 *)
-module TLS = Domain.TLS
+module Local_storage = Thread_local_storage
