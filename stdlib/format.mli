@@ -1058,7 +1058,8 @@ val make_formatter :
 *)
 
 val make_synchronized_formatter :
-  (string -> int -> int -> unit) -> (unit -> unit) -> formatter Thread_local_storage.Key.t
+  (string -> int -> int -> unit) -> (unit -> unit) ->
+  formatter Thread_local_storage.Key.t
 [@@alert unstable][@@alert "-unstable"]
 (** [make_synchronized_formatter out flush] returns the key to the domain-local
     state that holds the domain-local formatter that outputs with function

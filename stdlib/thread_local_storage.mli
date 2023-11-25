@@ -35,7 +35,8 @@ module Key : sig
       If [split_from_parent] is provided, spawning a domain or thread will
       derive the child value (for this key) from the parent
       value. This computation happens in the parent thread and it
-      always happens, regardless of whether the child thread or domain will use it.
+      always happens, regardless of whether the child thread or
+      domain will use it.
       If the splitting function is expensive or requires
       child-side computation, consider using ['a Lazy.t key]:
 
@@ -69,4 +70,3 @@ val set : 'a Key.t -> 'a -> unit
 (** [set k v] updates the calling thread's thread-local state to associate
     the key [k] with value [v]. It overwrites any previous values associated
     to [k], which cannot be restored later. *)
-

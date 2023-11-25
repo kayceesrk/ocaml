@@ -335,12 +335,14 @@ let temp_file_name temp_dir prefix suffix =
   concat temp_dir (Printf.sprintf "%s%06x%s" prefix rnd suffix)
 
 let current_temp_dir_name =
-  Thread_local_storage.Key.create ~split_from_parent:Fun.id (fun () -> temp_dir_name)
+  Thread_local_storage.Key.create ~split_from_parent:Fun.id
+    (fun () -> temp_dir_name)
 
 let set_temp_dir_name s = Thread_local_storage.set current_temp_dir_name s
 let get_temp_dir_name () = Thread_local_storage.get current_temp_dir_name
 
-let temp_file ?(temp_dir = Thread_local_storage.get current_temp_dir_name) prefix suffix =
+let temp_file ?(temp_dir = Thread_local_storage.get current_temp_dir_name)
+    prefix suffix =
   let rec try_name counter =
     let name = temp_file_name temp_dir prefix suffix in
     try
