@@ -278,7 +278,7 @@ static caml_thread_t caml_thread_new_info(void)
   th = (caml_thread_t)caml_stat_alloc_noexc(sizeof(struct caml_thread_struct));
   if (th == NULL) return NULL;
   th->descr = Val_unit;
-  th->dls_state = Val_unit;
+  th->dls_state = Atom(0); /* Empty array */
   th->next = NULL;
   th->prev = NULL;
   th->domain_id = domain_state->id;
