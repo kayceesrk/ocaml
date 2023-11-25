@@ -9,7 +9,7 @@
 *)
 
 
-module TLS = Thread.TLS
+module TLS = Thread_local_storage
 
 let k1 : int TLS.key = TLS.new_key (fun () -> 0)
 
