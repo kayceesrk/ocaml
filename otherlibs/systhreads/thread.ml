@@ -45,8 +45,6 @@ let create fn arg =
   let pk = CamlinternalTLS.get_initial_keys () in
   thread_new
     (fun () ->
-      CamlinternalTLS.set_dls_state [||];
-
       try
         CamlinternalTLS.set_initial_keys pk;
         fn arg;
