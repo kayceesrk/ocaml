@@ -21,19 +21,7 @@ open CamlinternalTLS
 module Key = struct
   type 'a t = 'a key
 
-  let key_counter = Atomic.make 0
-
-  type key_initializer = CamlinternalTLS.key_initializer =
-    KI: 'a key * ('a -> 'a) -> key_initializer
-
-  let create ?split_from_parent init_orphan : _ t =
-    let idx = Atomic.fetch_and_add key_counter 1 in
-    let k = (idx, init_orphan) in
-    begin match split_from_parent with
-    | None -> ()
-    | Some split -> add_parent_key (KI(k, split))
-    end;
-    k
+  let create = CamlinternalTLS.new_key
 end
 
 let set = set

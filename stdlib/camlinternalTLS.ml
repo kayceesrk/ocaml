@@ -30,12 +30,23 @@ type 'a key = int * (unit -> 'a)
 type key_initializer =
   KI: 'a key * ('a -> 'a) -> key_initializer
 
+let key_counter = Atomic.make 0
+
 let parent_keys = Atomic.make ([] : key_initializer list)
 
 let rec add_parent_key ki =
   let l = Atomic.get parent_keys in
   if not (Atomic.compare_and_set parent_keys l (ki :: l))
   then add_parent_key ki
+
+let new_key ?split_from_parent init_orphan : _ key =
+  let idx = Atomic.fetch_and_add key_counter 1 in
+  let k = (idx, init_orphan) in
+  begin match split_from_parent with
+  | None -> ()
+  | Some split -> add_parent_key (KI(k, split))
+  end;
+  k
 
 (* If necessary, grow the current domain's local state array such that [idx]
  * is a valid index in the array. *)

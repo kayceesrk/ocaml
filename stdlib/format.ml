@@ -1024,30 +1024,30 @@ and err_formatter = formatter_of_out_channel Stdlib.stderr
 and str_formatter = formatter_of_buffer stdbuf
 
 (* Initialise domain local state *)
-module TLS = Domain.TLS
+module TLS = Thread_local_storage
 
-let stdbuf_key = TLS.new_key pp_make_buffer
+let stdbuf_key = TLS.Key.create pp_make_buffer
 let _ = TLS.set stdbuf_key stdbuf
 
-let str_formatter_key = TLS.new_key (fun () ->
+let str_formatter_key = TLS.Key.create (fun () ->
   formatter_of_buffer (TLS.get stdbuf_key))
 let _ = TLS.set str_formatter_key str_formatter
 
 let buffered_out_string key str ofs len =
-  Buffer.add_substring (Domain.TLS.get key) str ofs len
+  Buffer.add_substring (TLS.get key) str ofs len
 
 let buffered_out_flush oc key () =
-  let buf = Domain.TLS.get key in
+  let buf = TLS.get key in
   let len = Buffer.length buf in
   let str = Buffer.contents buf in
   output_substring oc str 0 len ;
   Stdlib.flush oc;
   Buffer.clear buf
 
-let std_buf_key = Domain.TLS.new_key (fun () -> Buffer.create pp_buffer_size)
-let err_buf_key = Domain.TLS.new_key (fun () -> Buffer.create pp_buffer_size)
+let std_buf_key = TLS.Key.create (fun () -> Buffer.create pp_buffer_size)
+let err_buf_key = TLS.Key.create (fun () -> Buffer.create pp_buffer_size)
 
-let std_formatter_key = TLS.new_key (fun () ->
+let std_formatter_key = TLS.Key.create (fun () ->
   let ppf =
     pp_make_formatter (buffered_out_string std_buf_key)
       (buffered_out_flush Stdlib.stdout std_buf_key) ignore ignore ignore
@@ -1059,7 +1059,7 @@ let std_formatter_key = TLS.new_key (fun () ->
   ppf)
 let _ = TLS.set std_formatter_key std_formatter
 
-let err_formatter_key = TLS.new_key (fun () ->
+let err_formatter_key = TLS.Key.create (fun () ->
   let ppf =
     pp_make_formatter (buffered_out_string err_buf_key)
       (buffered_out_flush Stdlib.stderr err_buf_key) ignore ignore ignore
@@ -1093,7 +1093,7 @@ let flush_str_formatter () =
   flush_buffer_formatter stdbuf str_formatter
 
 let make_synchronized_formatter output flush =
-  TLS.new_key (fun () ->
+  TLS.Key.create (fun () ->
     let buf = Buffer.create pp_buffer_size in
     let output' = Buffer.add_substring buf in
     let flush' () =

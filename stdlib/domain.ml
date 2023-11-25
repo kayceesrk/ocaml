@@ -87,17 +87,17 @@ let do_before_first_spawn () =
     first_spawn_function := (fun () -> ())
   end
 
-let at_exit_key = TLS.new_key (fun () -> (fun () -> ()))
+let at_exit_key = CamlinternalTLS.new_key (fun () -> (fun () -> ()))
 
 let at_exit f =
-  let old_exit : unit -> unit = TLS.get at_exit_key in
+  let old_exit : unit -> unit = CamlinternalTLS.get at_exit_key in
   let new_exit () =
     f (); old_exit ()
   in
-  TLS.set at_exit_key new_exit
+  CamlinternalTLS.set at_exit_key new_exit
 
 let do_at_exit () =
-  let f : unit -> unit = TLS.get at_exit_key in
+  let f : unit -> unit = CamlinternalTLS.get at_exit_key in
   f ()
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit
@@ -106,7 +106,7 @@ let _ = Stdlib.do_domain_local_at_exit := do_at_exit
 
 let spawn f =
   do_before_first_spawn ();
-  let pk = TLS.get_initial_keys () in
+  let pk = CamlinternalTLS.get_initial_keys () in
 
   (* [term_sync] is used to synchronize with the joining domains *)
   let term_sync =
@@ -117,7 +117,7 @@ let spawn f =
 
   let body () =
     match
-      TLS.set_initial_keys pk;
+      CamlinternalTLS.set_initial_keys pk;
       let res = f () in
       res
     with

@@ -27,10 +27,7 @@ external set_dls_state : dls_state -> unit =
 
 type 'a key = int * (unit -> 'a)
 
-type key_initializer =
-  KI: 'a key * ('a -> 'a) -> key_initializer
-
-val add_parent_key : key_initializer -> unit
+val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
 
 val set : 'a key -> 'a -> unit
 
