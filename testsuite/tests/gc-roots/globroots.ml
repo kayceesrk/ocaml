@@ -31,7 +31,7 @@ module Test(G: GLOBREF) () = struct
   let size = 1024
 
   let random_state =
-    Thread_local_storage.new_key
+    Thread_local_storage.Key.create
       ~split_from_parent:Random.State.split
       Random.State.make_self_init
 
