@@ -122,7 +122,7 @@ endif
 
 OC_NATIVE_CPPFLAGS += -DSYS_$(SYSTEM)
 
-OC_DEBUG_CPPFLAGS=-DDEBUG
+OC_DEBUG_CPPFLAGS=-DDEBUG -O0
 OC_INSTR_CPPFLAGS=-DCAML_INSTR
 
 ifeq "$(TOOLCHAIN)" "msvc"
@@ -269,7 +269,7 @@ build_config.h: $(ROOTDIR)/Makefile.config sak$(EXE)
 # Libraries and programs
 
 ocamlrun$(EXE): prims.$(O) libcamlrun.$(A)
-	$(MKEXE) -o $@ $^ $(LIBS)
+	$(MKEXE) -o $@ $^ $(LIBS) -lgc
 
 ocamlruns$(EXE): prims.$(O) libcamlrun_non_shared.$(A)
 	$(call MKEXE_USING_COMPILER,$@,$^ $(LIBS))
@@ -281,7 +281,7 @@ libcamlrun_non_shared.$(A): $(libcamlrun_non_shared_OBJECTS)
 	$(call MKLIB,$@, $^)
 
 ocamlrund$(EXE): prims.$(O) libcamlrund.$(A)
-	$(MKEXE) $(MKEXEDEBUGFLAG) -o $@ $^ $(LIBS)
+	$(MKEXE) $(MKEXEDEBUGFLAG) -o $@ $^ $(LIBS) -lgc
 
 libcamlrund.$(A): $(libcamlrund_OBJECTS)
 	$(call MKLIB,$@, $^)
@@ -299,10 +299,10 @@ libcamlrun_shared.$(SO): $(libcamlrunpic_OBJECTS)
 	$(MKDLL) -o $@ $^ $(BYTECCLIBS)
 
 libasmrun.$(A): $(libasmrun_OBJECTS)
-	$(call MKLIB,$@, $^)
+	$(call MKLIB,$@, $^ $(LIBS))
 
 libasmrund.$(A): $(libasmrund_OBJECTS)
-	$(call MKLIB,$@, $^)
+	$(call MKLIB,$@, $^ $(LIBS)
 
 libasmruni.$(A): $(libasmruni_OBJECTS)
 	$(call MKLIB,$@, $^)
@@ -351,7 +351,7 @@ ifneq "$(1)" "%"
 # don't use -MG and instead include $(BUILT_HEADERS) in the order only
 # dependencies to ensure that they exist before dependencies are computed.
 $(DEPDIR)/$(1).$(D): %.c | $(DEPDIR) $(BUILT_HEADERS)
-	$$(DEP_CC) $$(OC_CPPFLAGS) $$(CPPFLAGS) $$< -MT \
+	$$(DEP_CC) $$(OC_CFLAGS) $$(CFLAGS) $$(OC_CPPFLAGS) $$(CPPFLAGS) $$< -MT \
 	  '$$*$(subst %,,$(1)).$(O)' -MF $$@
 endif # ifneq "$(1)" "%"
 $(1).$(O): $(2).c

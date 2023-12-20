@@ -355,7 +355,7 @@ int caml_add_to_heap (char *m)
    to [Max_wosize].
    Return NULL when out of memory.
 */
-static value *expand_heap (mlsize_t request)
+/* static */ value *expand_heap (mlsize_t request)
 {
   /* these point to headers, but we do arithmetic on them, hence [value *]. */
   value *mem, *hp, *prev;
@@ -464,38 +464,9 @@ Caml_inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag, int track,
                                       uintnat profinfo)
 {
   header_t *hp;
-  value *new_block;
-
-  if (wosize > Max_wosize) return 0;
-  CAML_EV_ALLOC(wosize);
-  hp = caml_fl_allocate (wosize);
-  if (hp == NULL){
-    new_block = expand_heap (wosize);
-    if (new_block == NULL) return 0;
-    caml_fl_add_blocks ((value) new_block);
-    hp = caml_fl_allocate (wosize);
-  }
-
-  CAMLassert (Is_in_heap (Val_hp (hp)));
-
-  /* Inline expansion of caml_allocation_color. */
-  if (caml_gc_phase == Phase_mark || caml_gc_phase == Phase_clean ||
-      (caml_gc_phase == Phase_sweep && (char *)hp >= (char *)caml_gc_sweep_hp)){
-    Hd_hp (hp) = Make_header_with_profinfo (wosize, tag, Caml_black, profinfo);
-  }else{
-    CAMLassert (caml_gc_phase == Phase_idle
-            || (caml_gc_phase == Phase_sweep
-                && (char *)hp < (char *)caml_gc_sweep_hp));
-    Hd_hp (hp) = Make_header_with_profinfo (wosize, tag, Caml_white, profinfo);
-  }
-  CAMLassert (Hd_hp (hp)
-    == Make_header_with_profinfo (wosize, tag, caml_allocation_color (hp),
-                                  profinfo));
-  caml_allocated_words += Whsize_wosize (wosize);
-  if (caml_allocated_words > Caml_state->minor_heap_wsz){
-    CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ALLOC_SHR, 1);
-    caml_request_major_slice ();
-  }
+  hp = (header_t*) malloc (Bhsize_wosize (wosize));
+  Hd_hp (hp) =
+    Make_header_with_profinfo (wosize, tag, Caml_black, profinfo);
 #ifdef DEBUG
   {
     uintnat i;
@@ -504,8 +475,6 @@ Caml_inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag, int track,
     }
   }
 #endif
-  if(track)
-    caml_memprof_track_alloc_shr(Val_hp (hp));
   return Val_hp (hp);
 }
 
