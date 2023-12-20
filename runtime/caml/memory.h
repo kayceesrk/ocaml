@@ -221,18 +221,13 @@ extern void caml_alloc_small_dispatch (intnat wosize, int flags,
   CAMLassert ((wosize) >= 1);                                          \
   CAMLassert ((tag_t) (tag) < 256);                                    \
   CAMLassert ((wosize) <= Max_young_wosize);                           \
-  Caml_state_field(young_ptr) -= Whsize_wosize (wosize);               \
-  if (Caml_state_field(young_ptr) < Caml_state_field(young_limit)) {   \
-    Setup_for_gc;                                                      \
-    caml_alloc_small_dispatch((wosize), (track) | Alloc_small_origin,  \
-                              1, NULL);                                \
-    Restore_after_gc;                                                  \
-  }                                                                    \
-  Hd_hp (Caml_state_field(young_ptr)) =                                \
+  (result) = (value)malloc(Bhsize_wosize (wosize));                    \
+  Hd_hp (result) =                                                     \
     Make_header_with_profinfo ((wosize), (tag), 0, profinfo);          \
-  (result) = Val_hp (Caml_state_field(young_ptr));                     \
+  (result) = Val_hp (result);                                          \
   DEBUG_clear ((result), (wosize));                                    \
 }while(0)
+
 
 #define Alloc_small_with_profinfo(result, wosize, tag, profinfo) \
   Alloc_small_aux(result, wosize, tag, profinfo, CAML_DO_TRACK)

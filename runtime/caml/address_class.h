@@ -70,7 +70,7 @@
    (char *)(val) < (char *)Caml_state_field(young_end) && \
    (char *)(val) > (char *)Caml_state_field(young_start))
 
-#define Is_in_heap(a) (Classify_addr(a) & In_heap)
+#define Is_in_heap(a) 1
 
 #ifdef NO_NAKED_POINTERS
 
