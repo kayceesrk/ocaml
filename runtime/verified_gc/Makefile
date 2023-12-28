@@ -1,9 +1,9 @@
-all: libvergc.a
+all: libvergc.a librust_allocator.a
 
 %.o: %.c
 	$(CC) $(CFLAGS) -g -c $< -o $@
 
-libvergc.a: librust_allocator.a FStar.o LowStar_Prims.o Spec.o alloc.o gc.o
+libvergc.a: FStar.o LowStar_Prims.o Spec.o alloc.o gc.o
 	$(AR) rcs $@ $^
 
 librust_allocator.a:
