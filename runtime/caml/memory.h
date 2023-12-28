@@ -30,12 +30,6 @@
 #include "misc.h"
 #include "mlvalues.h"
 #include "domain.h"
-#include <gc/gc.h>
-
-#define malloc(n) GC_malloc(n)
-#define calloc(m,n) GC_malloc((m)*(n))
-#define free(p) GC_free(p)
-#define realloc(p,n) GC_realloc(p,n)
 
 #ifdef __cplusplus
 extern "C" {
@@ -219,6 +213,8 @@ enum caml_alloc_small_flags {
   CAML_FROM_C = 0,     CAML_FROM_CAML = 2
 };
 
+void* verified_allocate(mlsize_t wosize);
+
 extern void caml_alloc_small_dispatch (intnat wosize, int flags,
                                        int nallocs, unsigned char* alloc_lens);
 // Do not call asynchronous callbacks from allocation functions
@@ -227,7 +223,7 @@ extern void caml_alloc_small_dispatch (intnat wosize, int flags,
   CAMLassert ((wosize) >= 1);                                          \
   CAMLassert ((tag_t) (tag) < 256);                                    \
   CAMLassert ((wosize) <= Max_young_wosize);                           \
-  (result) = (value)malloc(Bhsize_wosize (wosize));                    \
+  (result) = (value)verified_allocate(Whsize_wosize (wosize));         \
   Hd_hp (result) =                                                     \
     Make_header_with_profinfo ((wosize), (tag), 0, profinfo);          \
   (result) = Val_hp (result);                                          \

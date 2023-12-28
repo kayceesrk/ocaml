@@ -466,7 +466,6 @@ CAMLexport void caml_main(char_os **argv)
 
   /* Initialize the domain */
   caml_init_domain();
-  GC_INIT();
 
   /* Determine options */
 #ifdef DEBUG

@@ -182,6 +182,7 @@ clean:
 	rm -f primitives primitives.new prims.c $(BUILT_HEADERS)
 	rm -f domain_state*.inc
 	rm -rf $(DEPDIR)
+	$(MAKE) -C verified_gc clean
 
 .PHONY: distclean
 distclean: clean
@@ -268,8 +269,15 @@ build_config.h: $(ROOTDIR)/Makefile.config sak$(EXE)
 
 # Libraries and programs
 
-ocamlrun$(EXE): prims.$(O) libcamlrun.$(A)
-	$(MKEXE) -o $@ $^ $(LIBS) -lgc
+libvergc.a:
+	$(MAKE) -C verified_gc
+	cp verified_gc/libvergc.a .
+
+librust_allocator.a: libvergc.a
+	cp verified_gc/librust_allocator.a .
+
+ocamlrun$(EXE): prims.$(O) libcamlrun.$(A) libvergc.a librust_allocator.a
+	$(MKEXE) -o $@ $^ $(LIBS)
 
 ocamlruns$(EXE): prims.$(O) libcamlrun_non_shared.$(A)
 	$(call MKEXE_USING_COMPILER,$@,$^ $(LIBS))
@@ -280,8 +288,8 @@ libcamlrun.$(A): $(libcamlrun_OBJECTS)
 libcamlrun_non_shared.$(A): $(libcamlrun_non_shared_OBJECTS)
 	$(call MKLIB,$@, $^)
 
-ocamlrund$(EXE): prims.$(O) libcamlrund.$(A)
-	$(MKEXE) $(MKEXEDEBUGFLAG) -o $@ $^ $(LIBS) -lgc
+ocamlrund$(EXE): prims.$(O) libcamlrund.$(A) libvergc.a librust_allocator.a
+	$(MKEXE) $(MKEXEDEBUGFLAG) -o $@ $^ $(LIBS)
 
 libcamlrund.$(A): $(libcamlrund_OBJECTS)
 	$(call MKLIB,$@, $^)
