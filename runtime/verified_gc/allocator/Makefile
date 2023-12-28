@@ -1,5 +1,5 @@
-CC?=gcc
-CXX?=g++
+CC?=gcc -g
+CXX?=g++ -g
 LINKDIR?=target/release
 DISTDIR?=dist
 rust-release:
