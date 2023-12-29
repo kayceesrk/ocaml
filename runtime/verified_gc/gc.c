@@ -223,6 +223,7 @@ void Impl_GC7_create_root_stack_and_gray_modified_heap_loop(
   }
 }
 
+/*
 void Impl_GC7_sweep_body_helper(uint8_t *g, uint64_t *h_index) {
   uint64_t h_index_val = *h_index;
   uint64_t c = Impl_GC_closure_infix_color_of_block(h_index_val, g);
@@ -243,6 +244,46 @@ void Impl_GC7_sweep1(uint8_t *g, uint64_t *h_index, uint64_t limit) {
     h_index[0U] = h_index_new;
   }
 }
+*/
+
+void
+Impl_GC7_sweep_body_helper_with_free_list(
+  uint8_t *g,
+  uint64_t *h_index,
+  uint64_t *free_list_ptr
+)
+{
+  uint64_t h_index_val = *h_index;
+  uint64_t c = Impl_GC_closure_infix_color_of_block(h_index_val, g);
+  if (c == Spec_GC_closure_infix_white)
+  {
+    Impl_GC_closure_infix_colorHeader1(g, h_index_val, Spec_GC_closure_infix_blue);
+    uint64_t free_list_ptr_val = *free_list_ptr;
+    uint64_t first_field_free_list_ptr = free_list_ptr_val + (uint64_t)8U;
+    uint32_t x1 = FStar_UInt32_uint_to_t(FStar_UInt64_v(first_field_free_list_ptr));
+    store64_le(g + x1, h_index_val);
+    free_list_ptr[0U] = h_index_val;
+  }
+  else if (c == Spec_GC_closure_infix_black)
+    Impl_GC_closure_infix_colorHeader1(g, h_index_val,
+                                       Spec_GC_closure_infix_white);
+}
+
+void Impl_GC7_sweep1_with_free_list(uint8_t *g, uint64_t *h_index,
+                                    uint64_t limit,
+                                    uint64_t *free_list_ptr)
+{
+  while (*h_index < limit)
+  {
+    uint64_t h_index_val = *h_index;
+    uint64_t wz = Impl_GC_closure_infix_wosize_of_block(h_index_val, g);
+    uint64_t h_index_new = h_index_val + (wz + (uint64_t)1U) * (uint64_t)8U;
+    Impl_GC7_sweep_body_helper_with_free_list(g, h_index, free_list_ptr);
+    h_index[0U] = h_index_new;
+  }
+}
+
+extern size_t get_freelist_head();
 
 void Impl_GC7_mark_and_sweep_GC1_aux(uint8_t *g, uint64_t *st, uint64_t *st_top,
                                      uint64_t *h_list, uint64_t h_list_length,
@@ -250,7 +291,7 @@ void Impl_GC7_mark_and_sweep_GC1_aux(uint8_t *g, uint64_t *st, uint64_t *st_top,
   //Impl_GC7_create_root_stack_and_gray_modified_heap_loop(g, st, st_top, h_list,
   //                                                       h_list_length);
   Impl_GC_closure_infix_mark_heap(g, st, st_top);
-  Impl_GC7_sweep1(g, h_index, limit);
+  Impl_GC7_sweep1_with_free_list(g, h_index, limit, (uint64_t*)get_freelist_head());
 }
 
 // Handwritten
