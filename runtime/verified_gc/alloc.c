@@ -5,6 +5,7 @@
 
 #define CAML_INTERNALS
 #include "../caml/misc.h"
+#include "../caml/mlvalues.h"
 
 struct HeapRange {
   size_t first_header;
@@ -36,4 +37,10 @@ again:
     goto again;
   }
   return mem;
+}
+
+value verified_trigger_gc (value unit) {
+  mark_and_sweep(get_heap_range().first_header,
+                 get_heap_range().rightmost_value);
+  return Val_unit;
 }

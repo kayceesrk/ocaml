@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "internal/FStar.h"
 #include "internal/Spec.h"
 #include "gc.h"
@@ -12,6 +13,10 @@
 /* uint64_t num_of_roots = 0; */
 uint64_t *stack = NULL;
 uint64_t *stack_top = NULL;
+
+//For debugging
+uint64_t hs = 0; //Heap Start
+uint64_t he = 0; //Heap End
 
 Prims_int Impl_GC_closure_infix_op_Bang(uint64_t x) {
   return FStar_UInt64_v(x);
@@ -78,6 +83,9 @@ void Impl_GC_closure_infix_push_to_stack(uint8_t *g, uint64_t *st,
                                          uint64_t *st_len, uint64_t elem) {
   uint64_t i = *st_len;
   uint64_t f_elem = Spec_GC_closure_infix_f_address(elem);
+
+  assert (f_elem >= hs && f_elem <= he);
+
   st[FStar_UInt32_uint_to_t(FStar_UInt64_v(i))] = f_elem;
   st_len[0U] = *st_len + (uint64_t)1U;
   uint64_t i1 = *st_len;
@@ -238,15 +246,18 @@ void Impl_GC7_sweep1(uint8_t *g, uint64_t *h_index, uint64_t limit) {
 void Impl_GC7_mark_and_sweep_GC1_aux(uint8_t *g, uint64_t *st, uint64_t *st_top,
                                      uint64_t *h_list, uint64_t h_list_length,
                                      uint64_t *h_index, uint64_t limit) {
-  Impl_GC7_create_root_stack_and_gray_modified_heap_loop(g, st, st_top, h_list,
-                                                         h_list_length);
+  //Impl_GC7_create_root_stack_and_gray_modified_heap_loop(g, st, st_top, h_list,
+  //                                                       h_list_length);
   Impl_GC_closure_infix_mark_heap(g, st, st_top);
   Impl_GC7_sweep1(g, h_index, limit);
 }
 
 // Handwritten
 void darken_root(value root, value *root_ptr) {
-  Impl_GC_closure_infix_push_to_stack(NULL, stack, stack_top, (uint64_t)root);
+  if (Is_block(root)) {
+    Impl_GC_closure_infix_push_to_stack(NULL, stack, stack_top,
+                                        (uint64_t)Hp_val(root));
+  }
 }
 
 void Impl_GC7_mark_and_sweep_GC1(uint8_t *g, uint64_t *h_list,
@@ -260,7 +271,7 @@ void Impl_GC7_mark_and_sweep_GC1(uint8_t *g, uint64_t *h_list,
   stack_top = KRML_HOST_CALLOC((uint32_t)1U, sizeof(uint64_t));
   uint64_t *h_index_buf = KRML_HOST_CALLOC((uint32_t)1U, sizeof(uint64_t));
   *h_index_buf = free_list_start_ptr;
-  caml_do_roots(darken_root, 0);
+  caml_do_roots(darken_root, 1);
 
   Impl_GC7_mark_and_sweep_GC1_aux(g, stack, stack_top, h_list, h_list_length,
                                   h_index_buf, free_list_end_ptr);
@@ -271,7 +282,9 @@ void Impl_GC7_mark_and_sweep_GC1(uint8_t *g, uint64_t *h_list,
 }
 
 void mark_and_sweep(uint64_t xheap_start, uint64_t heap_end) {
+  hs = xheap_start;
+  he = heap_end;
   uint64_t locally_maintained_roots[] = {};
-  Impl_GC7_mark_and_sweep_GC1(NULL, locally_maintained_roots, 0, xheap_start,
-                              heap_end);
+  Impl_GC7_mark_and_sweep_GC1(NULL, locally_maintained_roots, 1024 * 1024,
+                              xheap_start, heap_end);
 }
