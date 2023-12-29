@@ -84,7 +84,8 @@ void Impl_GC_closure_infix_push_to_stack(uint8_t *g, uint64_t *st,
   uint64_t i = *st_len;
   uint64_t f_elem = Spec_GC_closure_infix_f_address(elem);
 
-  assert (f_elem >= hs && f_elem <= he);
+  assert (f_elem >= hs && f_elem <= he // the object must be in the heap
+          || Wosize_val(f_elem) == 0); // or it must be a block with size 0
 
   st[FStar_UInt32_uint_to_t(FStar_UInt64_v(i))] = f_elem;
   st_len[0U] = *st_len + (uint64_t)1U;
@@ -254,7 +255,7 @@ void Impl_GC7_mark_and_sweep_GC1_aux(uint8_t *g, uint64_t *st, uint64_t *st_top,
 
 // Handwritten
 void darken_root(value root, value *root_ptr) {
-  if (Is_block(root)) {
+  if (Is_block(root) && Wosize_val(root) > 0) {
     Impl_GC_closure_infix_push_to_stack(NULL, stack, stack_top,
                                         (uint64_t)Hp_val(root));
   }

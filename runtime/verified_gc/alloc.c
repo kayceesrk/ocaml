@@ -17,7 +17,6 @@ struct HeapRange {
 
 extern uint8_t *alloc(unsigned long long);
 extern struct HeapRange get_heap_range();
-extern size_t get_freelist_head();
 
 void* verified_allocate(unsigned long long wsize) {
   uint8_t *mem = alloc(wsize);
@@ -31,7 +30,8 @@ again:
       caml_fatal_error("Allocator OOM");
     }
 
-    mark_and_sweep(get_freelist_head(), get_heap_range().rightmost_value);
+    mark_and_sweep(get_heap_range().first_header,
+                   get_heap_range().rightmost_value);
 
     mem = alloc(wsize);
     goto again;
