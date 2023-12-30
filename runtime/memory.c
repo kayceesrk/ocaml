@@ -464,7 +464,7 @@ Caml_inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag, int track,
                                       uintnat profinfo)
 {
   header_t *hp;
-  hp = (header_t*) verified_allocate (Whsize_wosize (wosize));
+  hp = (header_t*) verified_allocate (wosize);
   Hd_hp (hp) =
     Make_header_with_profinfo (wosize, tag, Caml_black, profinfo);
 #ifdef DEBUG

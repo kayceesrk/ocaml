@@ -1,22 +1,21 @@
-#include <assert.h>
+#include "gc.h"
 #include "internal/FStar.h"
 #include "internal/Spec.h"
-#include "gc.h"
+#include <assert.h>
 
 #define CAML_INTERNALS
+#include "../caml/misc.h"
 #include "../caml/mlvalues.h"
 #include "../caml/roots.h"
-#include "../caml/misc.h"
-
 
 /* uint64_t roots[MAXIMUM_NO_OF_ROOTS] = {}; */
 /* uint64_t num_of_roots = 0; */
 uint64_t *stack = NULL;
 uint64_t *stack_top = NULL;
 
-//For debugging
-uint64_t hs = 0; //Heap Start
-uint64_t he = 0; //Heap End
+// For debugging
+uint64_t hs = 0; // Heap Start
+uint64_t he = 0; // Heap End
 
 Prims_int Impl_GC_closure_infix_op_Bang(uint64_t x) {
   return FStar_UInt64_v(x);
@@ -77,6 +76,10 @@ void Impl_GC_closure_infix_colorHeader1(uint8_t *g, uint64_t v_id, uint64_t c) {
   uint64_t h_val = Spec_GC_closure_infix_makeHeader(wz, c, tg);
   uint32_t x1 = FStar_UInt32_uint_to_t(FStar_UInt64_v(v_id));
   store64_le(g + x1, h_val);
+  /* if (c == Spec_GC_closure_infix_black) { */
+  /*   printf("Block: %p has color black, sz: %d, tg: %d\n", Val_hp(v_id), wz,
+   * tg); */
+  /* } */
 }
 
 void Impl_GC_closure_infix_push_to_stack(uint8_t *g, uint64_t *st,
@@ -84,8 +87,8 @@ void Impl_GC_closure_infix_push_to_stack(uint8_t *g, uint64_t *st,
   uint64_t i = *st_len;
   uint64_t f_elem = Spec_GC_closure_infix_f_address(elem);
 
-  assert (f_elem >= hs && f_elem <= he // the object must be in the heap
-          || Wosize_val(f_elem) == 0); // or it must be a block with size 0
+  assert((f_elem >= hs && f_elem < he) // the object must be in the heap
+         || Wosize_val(f_elem) == 0);  // or it must be a block with size 0
 
   st[FStar_UInt32_uint_to_t(FStar_UInt64_v(i))] = f_elem;
   st_len[0U] = *st_len + (uint64_t)1U;
@@ -190,7 +193,7 @@ void Impl_GC_closure_infix_darken_wrapper_impl(uint8_t *g, uint64_t *st,
   if (Impl_GC_closure_infix_tag_of_block(h_x, g) == (uint64_t)247U) {
     uint64_t x = Spec_GC_closure_infix_f_address(h_x);
     uint64_t start_env = Impl_GC_closure_infix_start_env_clos_info(g, x);
-    Impl_GC_closure_infix_darken1(g, st, st_len, h_x, wz, start_env);
+    Impl_GC_closure_infix_darken1(g, st, st_len, h_x, wz, start_env + 1);
   } else
     Impl_GC_closure_infix_darken1(g, st, st_len, h_x, wz, (uint64_t)1U);
 }
@@ -246,57 +249,81 @@ void Impl_GC7_sweep1(uint8_t *g, uint64_t *h_index, uint64_t limit) {
 }
 */
 
-void
-Impl_GC7_sweep_body_helper_with_free_list(
-  uint8_t *g,
-  uint64_t *h_index,
-  uint64_t *free_list_ptr
-)
-{
-  uint64_t h_index_val = *h_index;
-  uint64_t c = Impl_GC_closure_infix_color_of_block(h_index_val, g);
-  if (c == Spec_GC_closure_infix_white)
-  {
-    Impl_GC_closure_infix_colorHeader1(g, h_index_val, Spec_GC_closure_infix_blue);
-    uint64_t free_list_ptr_val = *free_list_ptr;
-    uint64_t first_field_free_list_ptr = free_list_ptr_val + (uint64_t)8U;
-    uint32_t x1 = FStar_UInt32_uint_to_t(FStar_UInt64_v(first_field_free_list_ptr));
-    store64_le(g + x1, h_index_val);
-    free_list_ptr[0U] = h_index_val;
+void Impl_GC7_sweep_body_helper_with_free_list(uint8_t *g, uint64_t *v_index,
+                                               uint64_t *free_list_ptr) {
+  uint64_t v_index_val = *v_index;
+  uint64_t c =
+      Impl_GC_closure_infix_color_of_block((uint64_t)(Hp_val(v_index_val)), g);
+
+  if (Impl_GC_closure_infix_wosize_of_block((uint64_t)Hp_val(v_index_val), g) ==
+      0) {
+    /* printf("Empty block %p with color: %d\n", (uint64_t *)v_index_val, c); */
+    return;
   }
-  else if (c == Spec_GC_closure_infix_black)
-    Impl_GC_closure_infix_colorHeader1(g, h_index_val,
+  if (c == Spec_GC_closure_infix_white || c == Spec_GC_closure_infix_blue) {
+
+    Impl_GC_closure_infix_colorHeader1(g, (uint64_t)Hp_val(v_index_val),
+                                       Spec_GC_closure_infix_blue);
+    uint64_t free_list_ptr_val = *free_list_ptr;
+    /* uint64_t first_field_free_list_ptr = free_list_ptr_val + (uint64_t)8U; */
+    uint64_t first_field_free_list_ptr = free_list_ptr_val;
+    uint32_t x1 =
+        FStar_UInt32_uint_to_t(FStar_UInt64_v(first_field_free_list_ptr));
+    store64_le(g + x1, v_index_val);
+    free_list_ptr[0U] = v_index_val;
+  } else if (c == Spec_GC_closure_infix_black) {
+    Impl_GC_closure_infix_colorHeader1(g, (uint64_t)Hp_val(v_index_val),
                                        Spec_GC_closure_infix_white);
+  }
 }
 
-void Impl_GC7_sweep1_with_free_list(uint8_t *g, uint64_t *h_index,
-                                    uint64_t limit,
-                                    uint64_t *free_list_ptr)
-{
-  while (*h_index < limit)
-  {
-    uint64_t h_index_val = *h_index;
-    uint64_t wz = Impl_GC_closure_infix_wosize_of_block(h_index_val, g);
-    uint64_t h_index_new = h_index_val + (wz + (uint64_t)1U) * (uint64_t)8U;
-    Impl_GC7_sweep_body_helper_with_free_list(g, h_index, free_list_ptr);
-    h_index[0U] = h_index_new;
+void Impl_GC7_sweep1_with_free_list(uint8_t *g, uint64_t *v_index,
+                                    uint64_t limit, uint64_t *free_list_ptr) {
+  while (*v_index < limit) {
+    uint64_t v_index_val = *v_index;
+    uint64_t wz =
+        Impl_GC_closure_infix_wosize_of_block((uint64_t)Hp_val(v_index_val), g);
+    /* printf( */
+    /*     "Block %p, sz: %d, color: %d, tag:%d\n", (uint64_t *)v_index_val, wz,
+     */
+    /*     Impl_GC_closure_infix_color_of_block((uint64_t)Hp_val(v_index_val),
+     * g), */
+    /*     Impl_GC_closure_infix_tag_of_block((uint64_t)Hp_val(v_index_val),
+     * g)); */
+    uint64_t v_index_new = v_index_val + (wz + 1) * (uint64_t)8U;
+    Impl_GC7_sweep_body_helper_with_free_list(g, v_index, free_list_ptr);
+    v_index[0U] = v_index_new;
   }
 }
 
 extern size_t get_freelist_head();
+extern void sweep();
 
 void Impl_GC7_mark_and_sweep_GC1_aux(uint8_t *g, uint64_t *st, uint64_t *st_top,
                                      uint64_t *h_list, uint64_t h_list_length,
                                      uint64_t *h_index, uint64_t limit) {
-  //Impl_GC7_create_root_stack_and_gray_modified_heap_loop(g, st, st_top, h_list,
-  //                                                       h_list_length);
+  // Impl_GC7_create_root_stack_and_gray_modified_heap_loop(g, st, st_top,
+  // h_list,
+  //                                                        h_list_length);
   Impl_GC_closure_infix_mark_heap(g, st, st_top);
-  Impl_GC7_sweep1_with_free_list(g, h_index, limit, (uint64_t*)get_freelist_head());
+
+  uint64_t freelist_starting_value = get_freelist_head();
+
+  uint64_t prev_ptr = (uint64_t)freelist_starting_value;
+  // Uncomment lines below to use verified sweep
+
+  /* Impl_GC7_sweep1_with_free_list(g, h_index, limit, &prev_ptr); */
+  sweep();
+
+  // Makes sure we're pointing to right places after sweep, expected by
+  // allocator that the last free pointer should point to null
+  /* *(uint64_t *)prev_ptr = 0U; */
 }
 
 // Handwritten
 void darken_root(value root, value *root_ptr) {
-  if (Is_block(root) && Wosize_val(root) > 0) {
+  assert(root == *root_ptr);
+  if (Is_block(root) && Wosize_val(root) > 0 && root >= hs && root < he) {
     Impl_GC_closure_infix_push_to_stack(NULL, stack, stack_top,
                                         (uint64_t)Hp_val(root));
   }
@@ -327,6 +354,8 @@ void mark_and_sweep(uint64_t xheap_start, uint64_t heap_end) {
   hs = xheap_start;
   he = heap_end;
   uint64_t locally_maintained_roots[] = {};
+  printf("About to collect\n");
   Impl_GC7_mark_and_sweep_GC1(NULL, locally_maintained_roots, 1024 * 1024,
                               xheap_start, heap_end);
+  printf("Finished collection\n");
 }
