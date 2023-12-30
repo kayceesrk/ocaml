@@ -1,3 +1,4 @@
+TYPE=debug
 all: libvergc.a librust_allocator.a
 
 %.o: %.c
@@ -7,8 +8,8 @@ libvergc.a: FStar.o LowStar_Prims.o Spec.o alloc.o gc.o
 	$(AR) rcs $@ $^
 
 librust_allocator.a:
-	$(MAKE) -C allocator
-	cp allocator/target/release/librust_allocator.a .
+	$(MAKE) -C allocator rust-$(TYPE)
+	cp allocator/target/$(TYPE)/librust_allocator.a .
 
 clean:
 	$(MAKE) -C allocator clean

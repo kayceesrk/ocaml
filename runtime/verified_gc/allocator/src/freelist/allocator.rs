@@ -488,6 +488,13 @@ impl NfAllocator {
         while (cur_hp as usize) < limit {
             let cur_hd = hd_hp!(cur_hp);
             let mut cur_val = val_hp!(cur_hp);
+            // println!(
+            //     "Val: {:#x?} has color: {:?}, tag: {:?}, sz: {:?}",
+            //     cur_val.0,
+            //     cur_hd.get_color(),
+            //     cur_hd.get_tag(),
+            //     cur_hd.get_wosize().get_val()
+            // );
             match cur_hd.get_color() {
                 BLACK => {
                     // Live
