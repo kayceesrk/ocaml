@@ -312,12 +312,12 @@ void Impl_GC7_mark_and_sweep_GC1_aux(uint8_t *g, uint64_t *st, uint64_t *st_top,
   uint64_t prev_ptr = (uint64_t)freelist_starting_value;
   // Uncomment lines below to use verified sweep
 
-  /* Impl_GC7_sweep1_with_free_list(g, h_index, limit, &prev_ptr); */
-  sweep();
+  Impl_GC7_sweep1_with_free_list(g, h_index, limit, &prev_ptr);
+  /* sweep(); */
 
   // Makes sure we're pointing to right places after sweep, expected by
   // allocator that the last free pointer should point to null
-  /* *(uint64_t *)prev_ptr = 0U; */
+  *(uint64_t *)prev_ptr = 0U;
 }
 
 // Handwritten

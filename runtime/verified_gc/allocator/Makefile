@@ -2,7 +2,8 @@ CC?=gcc -g
 CXX?=g++ -g
 LINKDIR?=target/release
 DISTDIR?=dist
-CARGO_FLAGS?=--features "no_expand_heap" --features "check_invariants"
+# CARGO_FLAGS?=--features "no_expand_heap" --features "check_invariants"
+CARGO_FLAGS?=--features "no_expand_heap"
 
 rust-release:
 	cargo build --release $(CARGO_FLAGS)
