@@ -1,4 +1,4 @@
-TYPE=debug
+TYPE=release
 all: libvergc.a librust_allocator.a
 
 %.o: %.c

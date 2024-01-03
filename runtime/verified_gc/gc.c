@@ -354,8 +354,8 @@ void mark_and_sweep(uint64_t xheap_start, uint64_t heap_end) {
   hs = xheap_start;
   he = heap_end;
   uint64_t locally_maintained_roots[] = {};
-  printf("About to collect\n");
+  /* printf("About to collect\n"); */
   Impl_GC7_mark_and_sweep_GC1(NULL, locally_maintained_roots, 1024 * 1024,
                               xheap_start, heap_end);
-  printf("Finished collection\n");
+  /* printf("Finished collection\n"); */
 }
