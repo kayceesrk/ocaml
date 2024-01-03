@@ -1,4 +1,3 @@
-#include "alloc.h"
 #include "gc.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -18,6 +17,11 @@ struct HeapRange {
 extern uint8_t *alloc(unsigned long long);
 extern struct HeapRange get_heap_range();
 
+void verified_gc() {
+  mark_and_sweep(get_heap_range().first_header + 8U,
+                 get_heap_range().rightmost_value);
+}
+
 void *verified_allocate(unsigned long long wsize) {
   /* printf("Allocation request for %lld\n", wsize); */
   uint8_t *mem = alloc(wsize);
@@ -31,17 +35,14 @@ again:
       caml_fatal_error("Allocator OOM");
     }
 
-    mark_and_sweep(get_heap_range().first_header + 8U,
-                   get_heap_range().rightmost_value);
-
+    verified_gc();
     mem = alloc(wsize);
     goto again;
   }
   return mem - 8U;
 }
 
-value verified_trigger_gc(value unit) {
-  mark_and_sweep(get_heap_range().first_header + 8U,
-                 get_heap_range().rightmost_value);
+CAMLprim value caml_trigger_verified_gc(value v) {
+  verified_gc();
   return Val_unit;
 }
