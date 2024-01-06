@@ -2,7 +2,7 @@ TYPE=release
 all: libvergc.a librust_allocator.a
 
 %.o: %.c
-	$(CC) $(CFLAGS) -g -c $< -o $@
+	$(CC) $(CFLAGS) -g -O2 -c $< -o $@
 
 libvergc.a: FStar.o LowStar_Prims.o Spec.o alloc.o gc.o
 	$(AR) rcs $@ $^
