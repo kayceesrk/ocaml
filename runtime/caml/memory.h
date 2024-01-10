@@ -223,7 +223,7 @@ extern void caml_alloc_small_dispatch (intnat wosize, int flags,
   CAMLassert ((wosize) >= 1);                                          \
   CAMLassert ((tag_t) (tag) < 256);                                    \
   CAMLassert ((wosize) <= Max_young_wosize);                           \
-  (result) = (value)verified_allocate(wosize);												 \
+  (result) = (value)verified_allocate((wosize));                       \
   Hd_hp (result) =                                                     \
     Make_header_with_profinfo ((wosize), (tag), 0, profinfo);          \
   (result) = Val_hp (result);                                          \
