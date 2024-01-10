@@ -294,7 +294,7 @@ ocamlrund$(EXE): prims.$(O) libcamlrund.$(A) libvergc.a librust_allocator.a
 libcamlrund.$(A): $(libcamlrund_OBJECTS)
 	$(call MKLIB,$@, $^)
 
-ocamlruni$(EXE): prims.$(O) libcamlruni.$(A)
+ocamlruni$(EXE): prims.$(O) libcamlruni.$(A) libvergc.a librust_allocator.a
 	$(MKEXE) -o $@ $^ $(INSTRUMENTED_RUNTIME_LIBS) $(LIBS)
 
 libcamlruni.$(A): $(libcamlruni_OBJECTS)
