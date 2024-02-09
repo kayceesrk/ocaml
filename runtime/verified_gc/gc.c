@@ -146,8 +146,7 @@ void Impl_GC_closure_infix_darken_body(uint8_t *g, uint64_t *st,
     uint64_t h_addr_succ = Spec_GC_closure_infix_hd_address(succ);
     if (Impl_GC_closure_infix_tag_of_block(h_addr_succ, g) == (uint64_t)249U) {
       uint64_t parent_hdr =
-          Impl_GC_closure_infix_parent_closure_of_infix_object_impl(g, h_index,
-                                                                    i);
+        Impl_GC_closure_infix_parent_closure_of_infix_object_impl(g, h_index, i);
       Impl_GC_closure_infix_darken_helper_impl(g, st, st_len, parent_hdr);
     } else
       Impl_GC_closure_infix_darken_helper_impl(g, st, st_len, h_addr_succ);
@@ -196,6 +195,13 @@ void Impl_GC_closure_infix_darken_wrapper_impl(uint8_t *g, uint64_t *st,
     uint64_t x = Spec_GC_closure_infix_f_address(h_x);
     uint64_t start_env = Impl_GC_closure_infix_start_env_clos_info(g, x);
     Impl_GC_closure_infix_darken1(g, st, st_len, h_x, wz, start_env + 1);
+  } else if (Impl_GC_closure_infix_tag_of_block(h_x, g) == (uint64_t)249U) {
+    //Handwritten
+    wz = *(uint64_t*)h_x >> 10;
+    h_x = h_x - wz * 8;
+    wz = *(uint64_t*)h_x >> 10;
+    assert (Tag_hp(h_x) == 247);
+    Impl_GC_closure_infix_darken_wrapper_impl (g, st, st_len, h_x, wz);
   } else
     Impl_GC_closure_infix_darken1(g, st, st_len, h_x, wz, (uint64_t)1U);
 }
