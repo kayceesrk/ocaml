@@ -87,8 +87,12 @@ void Impl_GC_closure_infix_push_to_stack(uint8_t *g, uint64_t *st,
   uint64_t i = *st_len;
   uint64_t f_elem = Spec_GC_closure_infix_f_address(elem);
 
+  /* if (!((f_elem >= hs && f_elem < he))) { */
+  /*   fprintf(stderr, "Range: %p to %p, but found %p\n", hs, he, f_elem); */
+
   assert((f_elem >= hs && f_elem < he) // the object must be in the heap
          || Wosize_val(f_elem) == 0);  // or it must be a block with size 0
+  /* } */
 
   st[FStar_UInt32_uint_to_t(FStar_UInt64_v(i))] = f_elem;
   st_len[0U] = *st_len + (uint64_t)1U;
@@ -169,8 +173,6 @@ void Impl_GC_closure_infix_darken1(uint8_t *g, uint64_t *st, uint64_t *st_len,
 /* Function used to extract the content of the closure info field from the
  * address of an object*/
 uint64_t Impl_GC_closure_infix_closinfo_val_impl(uint8_t *g, uint64_t f_addr) {
-  uint64_t hdr_f_addr = Spec_GC_closure_infix_hd_address(f_addr);
-  uint64_t wz = Impl_GC_closure_infix_wosize_of_block(hdr_f_addr, g);
   uint64_t offst1 = (uint64_t)8U;
   uint64_t s1 = f_addr + offst1;
   uint32_t x1 = FStar_UInt32_uint_to_t(FStar_UInt64_v(s1));
