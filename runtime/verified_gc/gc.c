@@ -261,9 +261,20 @@ void Impl_GC_closure_infix_sweep_body_helper_with_free_list1(
   if (c == Spec_GC_closure_infix_white || c == Spec_GC_closure_infix_blue) {
     Impl_GC_closure_infix_colorHeader1(g, h_index, Spec_GC_closure_infix_blue);
     uint64_t free_list_ptr_val = *free_list_ptr;
-    uint32_t x1 = FStar_UInt32_uint_to_t(FStar_UInt64_v(free_list_ptr_val));
-    store64_le(g + x1, f_index_val);
-    free_list_ptr[0U] = f_index_val;
+    /* Begin HW */
+    uint64_t cur_wosize = Wosize_val(free_list_ptr_val);
+    uint64_t next = free_list_ptr_val + cur_wosize * 8 + 8 /* header */;
+    if (next == f_index_val) {
+      uint64_t next_wosize = Wosize_val(f_index_val);
+      ((uint64_t*)free_list_ptr_val)[-1] =
+        Make_header(cur_wosize + next_wosize + 1, 0,
+                    Spec_GC_closure_infix_blue);
+    } else {
+      uint32_t x1 = FStar_UInt32_uint_to_t(FStar_UInt64_v(free_list_ptr_val));
+      store64_le(g + x1, f_index_val);
+      free_list_ptr[0U] = f_index_val;
+    }
+    /* End HW */
   } else
     Impl_GC_closure_infix_colorHeader1(g, h_index, Spec_GC_closure_infix_white);
 }
