@@ -570,11 +570,14 @@ CAMLexport void caml_minor_collection (void)
 
 CAMLexport value caml_check_urgent_gc (value extra_root)
 {
+  /* XXX KC: Disable native GC from triggering */
+  /*
   if (Caml_state->requested_major_slice || Caml_state->requested_minor_gc){
     CAMLparam1 (extra_root);
     caml_gc_dispatch();
     CAMLdrop;
   }
+  */
   return extra_root;
 }
 

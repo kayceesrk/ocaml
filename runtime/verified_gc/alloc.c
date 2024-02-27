@@ -19,6 +19,7 @@ extern struct HeapRange get_heap_range();
 
 void verified_gc() {
   caml_gc_message (0x20, "Triggering GC\n");
+  Caml_state->_stat_major_collections++;
   mark_and_sweep(get_heap_range().first_header + 8U,
                  get_heap_range().rightmost_value);
 }
