@@ -551,6 +551,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(CLOSURE): {
       int nvars = *pc++;
       int i;
+      value block;
       if (nvars > 0) *--sp = accu;
       if (nvars <= Max_young_wosize - 2) {
         /* nvars + 2 <= Max_young_wosize, can allocate in minor heap */
@@ -560,9 +561,10 @@ value caml_interprete(code_t prog, asize_t prog_size)
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
-				Setup_for_gc;
-        accu = caml_alloc_shr(2 + nvars, Closure_tag);
-				Restore_after_gc;
+        Setup_for_gc;
+        block = caml_alloc_shr(2 + nvars, Closure_tag);
+        Restore_after_gc;
+        accu = block;
         for (i = 0; i < nvars; i++) caml_initialize(&Field(accu, i + 2), sp[i]);
       }
       /* The code pointer is not in the heap, so no need to go through
@@ -581,6 +583,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       mlsize_t blksize = envofs + nvars;
       int i;
       value * p;
+      value block;
       if (nvars > 0) *--sp = accu;
       if (blksize <= Max_young_wosize) {
         Alloc_small(accu, blksize, Closure_tag);
@@ -590,9 +593,10 @@ value caml_interprete(code_t prog, asize_t prog_size)
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
-				Setup_for_gc;
-        accu = caml_alloc_shr(blksize, Closure_tag);
-				Restore_after_gc;
+        Setup_for_gc;
+        block = caml_alloc_shr(blksize, Closure_tag);
+        Restore_after_gc;
+        accu = block;
         p = &Field(accu, envofs);
         for (i = 0; i < nvars; i++, p++) caml_initialize(p, sp[i]);
       }
@@ -604,7 +608,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       *p++ = (value) (pc + pc[0]);
       *p++ = Make_closinfo(0, envofs);
       for (i = 1; i < nfuncs; i++) {
-        *p++ = Make_header(i * 3, Infix_tag, Caml_white); /* color irrelevant */
+        *p++ = Make_header(i * 3, Infix_tag, Caml_black); /* color irrelevant */
         *--sp = (value) p;
         *p++ = (value) (pc + pc[i]);
         envofs -= 3;
@@ -684,9 +688,9 @@ value caml_interprete(code_t prog, asize_t prog_size)
         Field(block, 0) = accu;
         for (i = 1; i < wosize; i++) Field(block, i) = *sp++;
       } else {
-				Setup_for_gc;
+        Setup_for_gc;
         block = caml_alloc_shr(wosize, tag);
-				Restore_after_gc;
+        Restore_after_gc;
         caml_initialize(&Field(block, 0), accu);
         for (i = 1; i < wosize; i++) caml_initialize(&Field(block, i), *sp++);
       }
@@ -729,9 +733,9 @@ value caml_interprete(code_t prog, asize_t prog_size)
       if (size <= Max_young_wosize / Double_wosize) {
         Alloc_small(block, size * Double_wosize, Double_array_tag);
       } else {
-				Setup_for_gc;
+        Setup_for_gc;
         block = caml_alloc_shr(size * Double_wosize, Double_array_tag);
-				Restore_after_gc;
+        Restore_after_gc;
       }
       Store_double_flat_field(block, 0, Double_val(accu));
       for (i = 1; i < size; i++){

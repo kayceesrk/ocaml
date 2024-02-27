@@ -14,6 +14,7 @@
 /*                                                                        */
 /**************************************************************************/
 
+DOMAIN_STATE(value, temp)
 DOMAIN_STATE(value*, young_limit)
 DOMAIN_STATE(value*, young_ptr)
 /* Minor heap limit. See minor_gc.c. */
