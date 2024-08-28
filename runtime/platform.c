@@ -27,6 +27,7 @@
 #include "caml/lf_skiplist.h"
 #include "caml/misc.h"
 #include "caml/signals.h"
+#include "caml/runtime_events.h"
 #ifdef HAS_SYS_MMAN_H
 #include <sys/mman.h>
 #endif
@@ -304,7 +305,9 @@ void caml_plat_futex_free(caml_plat_futex* ftx) {
 void caml_plat_futex_wait(caml_plat_futex* ftx,
                           caml_plat_futex_value undesired) {
   while (atomic_load_acquire(&ftx->value) == undesired) {
+    CAML_EV_BEGIN(EV_FUTEX_WAIT);
     CAML_PLAT_FUTEX_WAIT(&ftx->value, undesired);
+    CAML_EV_END(EV_FUTEX_WAIT);
   }
 }
 
