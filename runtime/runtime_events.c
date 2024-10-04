@@ -115,6 +115,9 @@ static int preserve_ring = 0;
 static atomic_uintnat runtime_events_enabled = 0;
 static atomic_uintnat runtime_events_paused = 0;
 
+/* Indicates whether the runtime events infrastructure has been torn down. */
+static atomic_uintnat runtime_events_torn_down = 0;
+
 static atomic_uintnat runtime_custom_event_index = 0;
 
 /* List of globally known events. This is used to figure which event has a
@@ -183,7 +186,7 @@ static void runtime_events_teardown_from_stw_single(int remove_file) {
     caml_stat_free(current_ring_loc);
     current_metadata = NULL;
 
-    atomic_store_release(&runtime_events_enabled, 0);
+    atomic_store_release(&runtime_events_torn_down, 1);
 }
 
 void caml_runtime_events_post_fork(void) {
@@ -199,6 +202,7 @@ void caml_runtime_events_post_fork(void) {
     the parent. */
     runtime_events_teardown_from_stw_single(0 /* don't remove the file */);
     /* stw_single: mutators and domains have not started after the fork yet. */
+    atomic_store_release(&runtime_events_enabled, 0);
 
     /* We still have the path and ring size from our parent */
     caml_runtime_events_start();
@@ -224,15 +228,16 @@ void caml_runtime_events_destroy(void) {
     write_to_ring(
       EV_RUNTIME, (ev_message_type){.runtime=EV_LIFECYCLE}, EV_RING_STOP, 0,
       NULL, 0);
+    atomic_store_release(&runtime_events_enabled, 0);
 
     /* clean up runtime_events when we exit if we haven't been instructed to
-      preserve the file. */
+       preserve the file. */
     int remove_file = preserve_ring ? 0 : 1;
     do {
       caml_try_run_on_all_domains(&stw_teardown_runtime_events,
                                   &remove_file, NULL);
     }
-    while( atomic_load_acquire(&runtime_events_enabled) );
+    while(!atomic_load_acquire(&runtime_events_torn_down));
   }
 }
 
@@ -386,6 +391,7 @@ static void runtime_events_create_from_stw_single(void) {
     caml_plat_unlock(&user_events_lock);
 
     atomic_store_release(&runtime_events_paused, 0);
+    atomic_store_release(&runtime_events_torn_down, 0);
 
     caml_ev_lifecycle(EV_RING_START, pid);
 
