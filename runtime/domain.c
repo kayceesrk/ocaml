@@ -276,10 +276,11 @@ static struct {
   NULL
 };
 
-static void add_next_to_stw_domains(void)
+static void add_to_stw_domains(void)
 {
   CAMLassert(stw_domains.participating_domains < caml_params->max_domains);
   stw_domains.participating_domains++;
+  Caml_state->is_stw_participant = 1;
 #ifdef DEBUG
   /* Enforce here the invariant for early-exit in
      [caml_interrupt_all_signal_safe], because the latter must be
@@ -306,6 +307,7 @@ static void remove_from_stw_domains(dom_internal* dom) {
   stw_domains.domains[i] =
       stw_domains.domains[stw_domains.participating_domains];
   stw_domains.domains[stw_domains.participating_domains] = dom;
+  Caml_state->is_stw_participant = 0;
 }
 
 static dom_internal* next_free_domain(void) {
@@ -640,6 +642,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_self = d;
   caml_state = domain_state;
 
+  domain_state->is_stw_participant = 0;
+  /* This status will be updated in [add_to_stw_domains] */
+
   domain_state->young_limit = 0;
   /* Synchronized with [caml_interrupt_all_signal_safe], so that the
      initializing write of young_limit happens before any
@@ -758,7 +763,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->trap_barrier_block = -1;
 #endif
 
-  add_next_to_stw_domains();
+  add_to_stw_domains();
   goto domain_init_complete;
 
 alloc_main_stack_failure:
