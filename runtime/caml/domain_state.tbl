@@ -62,6 +62,9 @@ DOMAIN_STATE(value*, gc_regs)
 /* Pointer to currently-used register bucket, or NULL.
    Documented in fiber.h. */
 
+DOMAIN_STATE(uintnat, is_stw_participant)
+/* Is this domain part of the stw participant set? */
+
 DOMAIN_STATE(struct caml_minor_tables*, minor_tables)
 
 DOMAIN_STATE(struct mark_stack*, mark_stack)

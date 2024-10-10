@@ -464,8 +464,9 @@ CAMLexport void caml_runtime_events_resume(void) {
 
 static inline int ring_is_active(void) {
     return
-      atomic_load_relaxed(&runtime_events_enabled)
-      && !atomic_load_relaxed(&runtime_events_paused);
+      Caml_state->is_stw_participant
+      && atomic_load_acquire(&runtime_events_enabled)
+      && !atomic_load_acquire(&runtime_events_paused);
 }
 
 CAMLexport int caml_runtime_events_are_active(void) {
