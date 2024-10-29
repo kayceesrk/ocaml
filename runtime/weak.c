@@ -78,8 +78,10 @@ CAMLprim value caml_ephe_create (value len)
     caml_invalid_argument ("Weak.create");
   res = caml_alloc_shr (size, Abstract_tag);
 
+  /* Add the new ephemeron to the live list */
   Ephe_link(res) = domain_state->ephe_info->live;
   domain_state->ephe_info->live = res;
+
   for (mlsize_t i = CAML_EPHE_DATA_OFFSET; i < size; i++)
     Field(res, i) = caml_ephe_none;
   /* run memprof callbacks */
@@ -275,7 +277,8 @@ static value ephe_get_field (value e, mlsize_t offset)
   if (elt == caml_ephe_none) {
     res = Val_none;
   } else {
-    caml_darken (Caml_state, elt, 0);
+    if (caml_marking_started())
+      caml_darken (Caml_state, elt, 0);
     res = caml_alloc_small (1, Tag_some);
     Field(res, 0) = elt;
   }
@@ -326,7 +329,8 @@ static void ephe_copy_and_darken(value from, value to)
   caml_domain_state* domain_state = Caml_state;
   while (i < Wosize_val(to)) {
     value field = Field(from, i);
-    caml_darken (domain_state, field, 0);
+    if (caml_marking_started())
+      caml_darken (domain_state, field, 0);
     Store_field(to, i, field);
     ++ i;
   }
@@ -502,7 +506,8 @@ CAMLprim value caml_ephe_blit_data (value es, value ed)
 
   value v = Ephe_data(es);
   do_set(ed, CAML_EPHE_DATA_OFFSET, v);
-  caml_darken(Caml_state, v, 0);
+  if (caml_marking_started())
+    caml_darken(Caml_state, v, 0);
   /* [ed] may be in [Caml_state->ephe_info->live] list. The data value may be
      unmarked. The ephemerons on the live list are not scanned during ephemeron
      marking. Hence, unconditionally darken the data value. */
