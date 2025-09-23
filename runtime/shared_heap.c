@@ -36,6 +36,8 @@
 #include "caml/sizeclasses.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+#include "caml/io.h"
+#include <unistd.h>
 
 CAMLexport atomic_uintnat caml_compactions_count;
 
@@ -47,6 +49,30 @@ struct global_heap_state caml_global_heap_state = {
   1 << HEADER_COLOR_SHIFT,
   2 << HEADER_COLOR_SHIFT,
 };
+
+struct cleanup_state {
+    int fds_closed;     /* Count of file descriptors closed */
+    int total_scanned;  /* Total objects scanned */
+};
+
+static void cleanup_fd(void* state, value v, volatile value* p) {
+    struct cleanup_state* stats = (struct cleanup_state*)state;
+    stats->total_scanned++;
+
+    if (Is_block(v)) {
+        if (Tag_val(v) == Custom_tag) {
+            const struct custom_operations* ops = Custom_ops_val(v);
+            if (ops && strcmp(ops->identifier, "channel") == 0) {
+                struct channel* chan = Channel(v);
+                if (chan && chan->fd != -1) {
+                    close(chan->fd);
+                    chan->fd = -1;
+                    stats->fds_closed++;
+                }
+            }
+        }
+    }
+}
 
 typedef struct pool {
   struct pool* next;
@@ -579,6 +605,25 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
       block */
       if (Has_status_hd(hd, caml_global_heap_state.GARBAGE)) {
         CAMLassert(Whsize_hd(hd) <= wh);
+
+
+        // If the tag bit is of a Continuation k which is unreachable
+        if (Tag_hd(hd) == Cont_tag) {
+          // caml_fatal_error("Unmarked Continuation Found In Major GC Sweep");
+          value cont = Val_hp(p);
+          struct stack_info* stk = Ptr_val(Field(cont, 0));
+          if (stk != NULL) {
+            struct cleanup_state stats = {0, 0};
+            caml_scan_stack(cleanup_fd, 0, &stats, stk, 0);
+            /* Cleanup statistics for debugging */
+            caml_gc_log("Cleaned up %d file descriptors from continuation "
+                        "(scanned %d objects)",
+                        stats.fds_closed,
+                        stats.total_scanned);
+            caml_free_stack(stk);
+          }
+        }
+
         if (Tag_hd (hd) == Custom_tag) {
           void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
           if (final_fun != NULL) final_fun(Val_hp(p));
