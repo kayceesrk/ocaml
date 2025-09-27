@@ -609,7 +609,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
 
         // If the tag bit is of a Continuation k which is unreachable
         if (Tag_hd(hd) == Cont_tag) {
-          // caml_fatal_error("Unmarked Continuation Found In Major GC Sweep");
+          caml_fatal_error("Unmarked Continuation Found In Major GC Sweep");
           value cont = Val_hp(p);
           struct stack_info* stk = Ptr_val(Field(cont, 0));
           if (stk != NULL) {
