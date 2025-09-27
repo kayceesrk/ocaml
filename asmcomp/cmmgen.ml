@@ -890,7 +890,7 @@ and transl_prim_1 env p arg dbg =
         (transl env arg) dbg)) dbg) dbg
   | Pperform ->
       let cont =
-        make_alloc dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0]
+        make_alloc ~major:true dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0]
       in
       Cop(Capply typ_val,
        [Cconst_symbol ("caml_perform", dbg); transl env arg; cont],
