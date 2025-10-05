@@ -41,6 +41,7 @@
 #include "caml/signals.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+#include "caml/cont_dll.h"
 
 struct generic_table CAML_TABLE_STRUCT(char);
 
@@ -274,13 +275,16 @@ static void oldify_one (void* st_v, value v, volatile value *p)
 
   if (tag == Cont_tag) {
     value stack_value = Field(v, 0);
-    CAMLassert(Wosize_hd(hd) == 2);
+    CAMLassert(Wosize_hd(hd) == 4);
     CAMLassert(infix_offset == 0);
-    result = alloc_shared(st->domain, 2, Cont_tag, Reserved_hd(hd));
+    result = alloc_shared(st->domain, 4, Cont_tag, Reserved_hd(hd));
     if( try_update_object_header(v, p, result, 0) ) {
       struct stack_info* stk = Ptr_val(stack_value);
       Field(result, 0) = stack_value;
       Field(result, 1) = Field(v, 1);
+      /* initialize prev/next fields to zero (they were not present before) */
+      Field(result, 2) = Val_long(0);
+      Field(result, 3) = Val_long(0);
       if (stk != NULL) {
         caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
                         stk, 0);

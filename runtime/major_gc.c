@@ -39,6 +39,7 @@
 #include "caml/shared_heap.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+#include "caml/cont_dll.h"
 
 /* Default speed setting for the major GC. */
 _Atomic uintnat caml_percent_free = Percent_free_def;
@@ -1949,6 +1950,8 @@ static void major_collection_slice(intnat howmuch,
 
   if (!domain_state->sweeping_done) {
     if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
+      /* Debug: print continuation lists before sweeping */
+      caml_cont_dll_print("before-sweep");
 
     while (!domain_state->sweeping_done &&
            (budget = get_major_slice_work(mode)) > 0) {

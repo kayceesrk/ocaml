@@ -889,12 +889,20 @@ and transl_prim_1 env p arg dbg =
       tag_int (bswap16 (ignore_high_bit_int (untag_int
         (transl env arg) dbg)) dbg) dbg
   | Pperform ->
-      let cont =
-        make_alloc ~major:true dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0]
+      let cont_expr =
+        (* Allocate continuation with two extra fields for prev and next pointers *)
+        make_alloc dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0; int_const dbg 0; int_const dbg 0]
       in
-      Cop(Capply typ_val,
-       [Cconst_symbol ("caml_perform", dbg); transl env arg; cont],
-       dbg)
+      let cont_id = V.create_local "cont" in
+      Clet(VP.create cont_id,
+           cont_expr,
+           Csequence(
+             (* Insert the new continuation into the todo list *)
+             Cop(Cextcall("caml_cont_dll_insert_todo", typ_void, [], false), [Cvar cont_id], dbg),
+             Cop(Capply typ_val,
+                 [Cconst_symbol ("caml_perform", dbg); transl env arg; Cvar cont_id],
+                 dbg)
+           ))
   | Pdls_get ->
       Cop(Cdls_get, [transl env arg], dbg)
   | Ppoll ->

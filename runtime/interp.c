@@ -38,6 +38,7 @@
 #include "caml/globroots.h"
 #include "caml/startup.h"
 #include "caml/startup_aux.h"
+#include "caml/cont_dll.h"
 
 /* Registers for the abstract machine:
         pc         the code pointer
@@ -1339,7 +1340,7 @@ do_resume: {
         goto raise_exception;
       }
 
-      Alloc_small(cont, 2, Cont_tag, Enter_gc);
+  Alloc_small(cont, 4, Cont_tag, Enter_gc);
 
       sp -= 4;
       sp[0] = Val_long(domain_state->trap_sp_off);
@@ -1351,8 +1352,14 @@ do_resume: {
       domain_state->current_stack = parent_stack;
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
-      Field(cont, 0) = Val_ptr(old_stack);
-      Field(cont, 1) = Val_ptr(old_stack);
+  Field(cont, 0) = Val_ptr(old_stack);
+  Field(cont, 1) = Val_ptr(old_stack);
+  /* prev and next pointers (fields 2 and 3) */
+  Field(cont, 2) = Val_long(0);
+  Field(cont, 3) = Val_long(0);
+
+  /* Insert into todo list */
+  caml_cont_dll_insert_todo(cont);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       extra_args = Long_val(sp[1]);

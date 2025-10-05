@@ -486,6 +486,12 @@ endef # INSTALL_STRIPPED_BYTE_PROG
 # bytecomp/bytelink.ml for further details.
 HEADER_NAME = runtime-launch-info
 
+# Ensure cont_dll is present in runtime_COMMON_C_SOURCES when Makefiles
+# are regenerated from templates. The top-level Makefile contains the
+# full runtime_COMMON_C_SOURCES, but templates may be regenerated from
+# this file; appending here avoids losing the cont_dll entry.
+runtime_COMMON_C_SOURCES += cont_dll
+
 ifeq "$(UNIX_OR_WIN32)" "win32"
 # Ensure that no command can create Cygwin symbolic links by ensuring that
 # symlink(2) will fail if native NTFS symlinks aren't available.

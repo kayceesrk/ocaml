@@ -66,6 +66,7 @@ META
 /_exitContinuation
 /_freeFd
 /_original
+/_contdll
 
 # specific files and patterns in sub-directories
 

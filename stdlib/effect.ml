@@ -43,6 +43,10 @@ external resume :
   ('a, 'b) stack -> ('c -> 'a) -> 'c -> last_fiber -> 'b = "%resume"
 external runstack : ('a, 'b) stack -> ('c -> 'a) -> 'c -> 'b = "%runstack"
 
+(* Remove continuation from C-level todo/live lists *)
+external caml_cont_dll_delete : 'a 'b. ('a,'b) continuation -> unit =
+  "caml_cont_dll_delete" [@@noalloc]
+
 module Deep = struct
 
   type nonrec ('a,'b) continuation = ('a,'b) continuation
@@ -57,12 +61,15 @@ module Deep = struct
   external cont_last_fiber : ('a, 'b) continuation -> last_fiber = "%field1"
 
   let continue k v =
+    caml_cont_dll_delete k;
     resume (take_cont_noexc k) (fun x -> x) v (cont_last_fiber k)
 
   let discontinue k e =
+    caml_cont_dll_delete k;
     resume (take_cont_noexc k) (fun e -> raise e) e (cont_last_fiber k)
 
   let discontinue_with_backtrace k e bt =
+    caml_cont_dll_delete k;
     resume (take_cont_noexc k) (fun e -> Printexc.raise_with_backtrace e bt)
       e (cont_last_fiber k)
 

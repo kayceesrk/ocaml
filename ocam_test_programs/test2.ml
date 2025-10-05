@@ -17,7 +17,7 @@ let () =
   match coin_flip () with
   | result -> print_endline result
   | effect Choose, k ->
-      Gc.minor ();
+      (* Gc.minor (); *)
       (* Keep the continuation k alive but don't resume it. *)
       let _ = Sys.opaque_identity [k] in
       print_endline "Continuation ignored and Gc.full_major calling";
