@@ -17,6 +17,7 @@ external perform : 'a t -> 'a = "%perform"
 
 type exn += Unhandled: 'a t -> exn
 exception Continuation_already_resumed
+exception Gc_unreachable
 
 let () =
   let printer = function
@@ -43,10 +44,6 @@ external resume :
   ('a, 'b) stack -> ('c -> 'a) -> 'c -> last_fiber -> 'b = "%resume"
 external runstack : ('a, 'b) stack -> ('c -> 'a) -> 'c -> 'b = "%runstack"
 
-(* Remove continuation from C-level todo/live lists *)
-external caml_cont_dll_delete : 'a 'b. ('a,'b) continuation -> unit =
-  "caml_cont_dll_delete" [@@noalloc]
-
 module Deep = struct
 
   type nonrec ('a,'b) continuation = ('a,'b) continuation
@@ -59,17 +56,30 @@ module Deep = struct
     ('c t -> ('c, 'b) continuation -> last_fiber -> 'b) ->
     ('a, 'b) stack = "caml_alloc_stack"
   external cont_last_fiber : ('a, 'b) continuation -> last_fiber = "%field1"
+  external cont_ll_remove : ('a, 'b) continuation -> unit =
+    "caml_cont_ll_remove" [@@noalloc]
 
   let continue k v =
-    caml_cont_dll_delete k;
+    cont_ll_remove k;
     resume (take_cont_noexc k) (fun x -> x) v (cont_last_fiber k)
 
   let discontinue k e =
-    caml_cont_dll_delete k;
+    cont_ll_remove k;
     resume (take_cont_noexc k) (fun e -> raise e) e (cont_last_fiber k)
 
+  let runtime_discontinue k exn =
+    try discontinue k exn with e when e == exn -> ()
+
+  (* Register discontinue for C runtime to call. The wrapper swallows the
+     propagated exception value so the runtime call always returns normally. *)
+  let () = Callback.register "Effect.discontinue" runtime_discontinue
+
+  (* Register a dedicated exception value for unreachable continuations so the
+     runtime does not have to rely on Invalid_argument. *)
+  let () = Callback.register_exception "Effect.Gc_unreachable" Gc_unreachable
+
   let discontinue_with_backtrace k e bt =
-    caml_cont_dll_delete k;
+    cont_ll_remove k;
     resume (take_cont_noexc k) (fun e -> Printexc.raise_with_backtrace e bt)
       e (cont_last_fiber k)
 
