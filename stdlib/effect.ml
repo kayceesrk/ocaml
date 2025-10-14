@@ -56,15 +56,11 @@ module Deep = struct
     ('c t -> ('c, 'b) continuation -> last_fiber -> 'b) ->
     ('a, 'b) stack = "caml_alloc_stack"
   external cont_last_fiber : ('a, 'b) continuation -> last_fiber = "%field1"
-  external cont_ll_remove : ('a, 'b) continuation -> unit =
-    "caml_cont_ll_remove" [@@noalloc]
 
   let continue k v =
-    cont_ll_remove k;
     resume (take_cont_noexc k) (fun x -> x) v (cont_last_fiber k)
 
   let discontinue k e =
-    cont_ll_remove k;
     resume (take_cont_noexc k) (fun e -> raise e) e (cont_last_fiber k)
 
   let runtime_discontinue k exn =
@@ -79,7 +75,6 @@ module Deep = struct
   let () = Callback.register_exception "Effect.Gc_unreachable" Gc_unreachable
 
   let discontinue_with_backtrace k e bt =
-    cont_ll_remove k;
     resume (take_cont_noexc k) (fun e -> Printexc.raise_with_backtrace e bt)
       e (cont_last_fiber k)
 

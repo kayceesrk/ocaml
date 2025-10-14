@@ -62,11 +62,7 @@ META
 /ocamlopt.opt
 /ocamlnat
 /_opam
-/_allocateMajor
-/_exitContinuation
-/_freeFd
-/_original
-/_contdll
+_*/
 
 # specific files and patterns in sub-directories
 

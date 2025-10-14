@@ -36,6 +36,7 @@
 #include "caml/sys.h"
 #include "caml/memprof.h"
 #include "caml/finalise.h"
+#include "caml/cont_ll.h"
 
 /* The set of pending signals (received but not yet processed).
    It is represented as a bit vector.
@@ -363,12 +364,15 @@ caml_result caml_do_pending_actions_res(void)
   result = caml_final_do_calls_res();
   if (caml_result_is_exception(result)) goto exception;
 
+  /* Process unreachable continuations in toclean list */
+  caml_discontinue_toclean();
+  
   /* Process external interrupts (e.g. preemptive systhread switching).
      By doing this last, we do not need to set the action pending flag
      in case a context switch happens: all actions have been processed
      at this point. */
   caml_process_external_interrupt();
-
+  
   return Result_unit;
 
 exception:

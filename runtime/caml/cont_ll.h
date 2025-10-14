@@ -7,7 +7,6 @@
 CAMLextern void caml_cont_ll_init(void);
 CAMLextern void caml_cont_ll_insert_todo(value cont);
 CAMLextern void caml_cont_ll_insert_toclean(value cont);
-CAMLextern void caml_cont_ll_remove(value cont);
 CAMLextern void caml_cont_ll_scan_todo_c(void (*cb)(value, void*), void *data);
 CAMLextern void caml_cont_ll_scan_todo_ocaml(value f);
 CAMLextern value caml_cont_ll_get_todo_head(void);

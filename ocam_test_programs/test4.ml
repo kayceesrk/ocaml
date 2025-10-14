@@ -1,16 +1,19 @@
 open Effect
 open Effect.Deep
 
-(* When the GC encounter an leaked continuation it tries to close all the file file descriptors that fiber is holding *)
-
 type _ Effect.t += Choose : bool Effect.t
 
 let coin_flip () =
-  if perform Choose then "Heads" else "Tails"
+  try
+    if perform Choose then "Heads" else "Tails"
+  with exn ->
+    Printf.eprintf "coin_flip raised: %s\n" (Printexc.to_string exn);
+    flush stderr;
+    raise exn
 
 let nested_live_continuations () =
   let live_ks = ref ([] : (bool, unit) continuation list) in  (* list to keep continuations alive *)
-  for i = 1 to 3 do
+  for i = 1 to 12 do
     match coin_flip () with
     | r -> Printf.printf "Result %d: %s\n" i r
     | effect Choose, k ->
@@ -23,11 +26,18 @@ let nested_live_continuations () =
   List.iteri (fun j k ->
     let original_i = List.length !live_ks - j in
     let value_to_pass = (original_i mod 2 = 0) in
-    Printf.printf "Resuming continuation (originally captured at i=%d) with value %b\n" original_i value_to_pass;
-    continue k value_to_pass
+    if value_to_pass then
+      begin
+        Printf.printf "Resuming continuation (originally captured at i=%d) with value %b\n" original_i value_to_pass;
+        continue k value_to_pass
+      end
+    else
+      begin
+        Printf.printf "Ignoring continuation (originally captured at i=%d) with value %b\n" original_i value_to_pass;
+      end
   ) !live_ks;
   Gc.full_major ();
-  Printf.printf "Full major GC completed. Continuations should be in the DLL.\n"
+  Printf.printf "Full major GC completed. Continuations should be in the LL.\n"
 
 let () =
   print_endline "Running nested live continuations example...";

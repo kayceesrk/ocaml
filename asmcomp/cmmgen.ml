@@ -898,7 +898,7 @@ and transl_prim_1 env p arg dbg =
            cont_expr,
            Csequence(
              (* Insert the new continuation into the todo list *)
-             Cop(Cextcall("caml_cont_dll_insert_todo", typ_void, [], false), [Cvar cont_id], dbg),
+             Cop(Cextcall("caml_cont_ll_insert_todo", typ_void, [], false), [Cvar cont_id], dbg),
              Cop(Capply typ_val,
                  [Cconst_symbol ("caml_perform", dbg); transl env arg; Cvar cont_id],
                  dbg)

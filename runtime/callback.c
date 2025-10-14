@@ -26,7 +26,7 @@
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
-#include "caml/cont_dll.h"
+#include "caml/cont_ll.h"
 
 /* A note about callbacks and GC.  For best performance, a callback such as
      [caml_callback_exn(value closure, value arg)]
@@ -59,10 +59,15 @@ Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
   if (parent_stack == NULL) {
     return Val_unit;
   } else {
-    /* Allocate continuation with extra fields for prev/next */
-    value cont = caml_alloc_4(Cont_tag, Val_ptr(parent_stack), Val_long(0), Val_long(0), Val_long(0));
+    /* Allocate continuation directly in major heap with extra field for next pointer.
+       Using major heap ensures continuations are tracked by major GC for leak detection. */
+    value cont = caml_alloc_shr(3, Cont_tag);
+    caml_initialize(&Field(cont, 0), Val_ptr(parent_stack));
+    caml_initialize(&Field(cont, 1), Val_long(0));
+    caml_initialize(&Field(cont, 2), Val_long(0)); /* next pointer for linked list */
+    
     /* Register cont in the todo list so it can be processed */
-    caml_cont_dll_insert_todo(cont);
+    caml_cont_ll_insert_todo(cont);
     Stack_parent(domain_state->current_stack) = NULL;
     return cont;
   }
@@ -98,7 +103,7 @@ void caml_init_callbacks(void)
   caml_thread_code(callback_code, sizeof(callback_code));
 #endif
   /* Initialize continuation dll module */
-  caml_cont_dll_init();
+  caml_cont_ll_init();
 }
 
 CAMLexport value caml_callbackN_exn(value closure, int narg, value args[])
@@ -175,7 +180,7 @@ CAMLexport value caml_callback3_exn(value closure,
 void caml_init_callbacks(void)
 {
   /* Initialize continuation dll module */
-  caml_cont_dll_init();
+  caml_cont_ll_init();
 }
 
 typedef value (callback_stub)(caml_domain_state* state,
