@@ -38,7 +38,7 @@
 #include "caml/globroots.h"
 #include "caml/startup.h"
 #include "caml/startup_aux.h"
-#include "caml/cont_dll.h"
+#include "caml/cont_ll.h"
 
 /* Registers for the abstract machine:
         pc         the code pointer
@@ -1340,7 +1340,9 @@ do_resume: {
         goto raise_exception;
       }
 
-  Alloc_small(cont, 4, Cont_tag, Enter_gc);
+      /* Allocate continuation directly in major heap to avoid minor GC issues.
+         Continuations must be tracked by the major GC for leak detection. */
+      cont = caml_alloc_shr(3, Cont_tag);
 
       sp -= 4;
       sp[0] = Val_long(domain_state->trap_sp_off);
@@ -1352,14 +1354,15 @@ do_resume: {
       domain_state->current_stack = parent_stack;
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
-  Field(cont, 0) = Val_ptr(old_stack);
-  Field(cont, 1) = Val_ptr(old_stack);
-  /* prev and next pointers (fields 2 and 3) */
-  Field(cont, 2) = Val_long(0);
-  Field(cont, 3) = Val_long(0);
+      
+      /* Initialize continuation fields using caml_initialize for major heap objects */
+      caml_initialize(&Field(cont, 0), Val_ptr(old_stack));
+      caml_initialize(&Field(cont, 1), Val_ptr(old_stack));
+      /* next pointer (field 2) for singly-linked list */
+      caml_initialize(&Field(cont, 2), Val_long(0));
 
   /* Insert into todo list */
-  caml_cont_dll_insert_todo(cont);
+  caml_cont_ll_insert_todo(cont);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       extra_args = Long_val(sp[1]);
