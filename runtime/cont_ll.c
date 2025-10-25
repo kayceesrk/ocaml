@@ -44,11 +44,35 @@ CAMLexport void caml_cont_ll_init(void)
    is reserved for next pointer. */
 
 static int is_valid_cont(value v) {
-  return Is_block(v) && Tag_val(v) == Cont_tag && Wosize_val(v) >= 3;
+  return Is_block(v) && Tag_val(v) == Cont_tag && Wosize_val(v) == 3;
 }
 
-Caml_inline value cont_next(value cont) {
-  return is_valid_cont(cont) ? Field(cont, 2) : Val_long(0);
+/* Remove collected or malformed continuations from the head of the todo list.
+   This prevents later code from following or mutating memory that the GC has
+   already reclaimed. Note that we only inspect fields after validating that
+   the node really is a continuation block. */
+static void prune_todo_prefix(void)
+{
+  value cur = todo_head;
+
+  while (Is_block(cur)) {
+    if (!is_valid_cont(cur)) {
+      /* We cannot safely walk past an invalid node; drop the entire list. */
+      todo_head = Val_long(0);
+      return;
+    }
+
+    if (Field(cur, 0) != Val_long(0)) {
+      /* Current head is still live; keep it. */
+      return;
+    }
+
+    /* Continuation already collected/resumed: unlink it. */
+    value next = cont_next(cur);
+    Field(cur, 2) = Val_long(0);
+    todo_head = next;
+    cur = next;
+  }
 }
 
 /* Insert [cont] at the head of the todo list.
@@ -62,11 +86,53 @@ CAMLexport void caml_cont_ll_insert_todo(value cont)
   }
 
   /* defensive: only operate on blocks */
+  if (!Is_block(cont)) return;
+
+  prune_todo_prefix();
+
+  Field(cont, 2) = todo_head;
+  todo_head = cont;
+}
+
+static void remove_from_list(value *head, value cont)
+{
+  value prev = Val_long(0);
+  value cur = *head;
+
+  while (Is_block(cur)) {
+    if (cur == cont) {
+      value next = cont_next(cur);
+      if (prev == Val_long(0)) {
+        *head = next;
+      } else if (is_valid_cont(prev)) {
+        Field(prev, 2) = next;
+      }
+      Field(cont, 2) = Val_long(0);
+      return;
+    }
+
+    if (!is_valid_cont(cur)) {
+      /* Encountered an invalid node while searching. Cut the list here to
+         avoid following potentially reclaimed memory. */
+      if (prev == Val_long(0)) {
+        *head = Val_long(0);
+      } else if (is_valid_cont(prev)) {
+        Field(prev, 2) = Val_long(0);
+      }
+      return;
+    }
+
+    prev = cur;
+    cur = cont_next(cur);
+  }
+}
+
+CAMLexport void caml_cont_ll_remove(value cont)
+{
   if (!is_valid_cont(cont)) return;
-  
-  Field(cont, 2) = todo_head;  /* new node points to head */
-  
-  todo_head = cont; /* new node becomes the head */
+
+  remove_from_list(&todo_head, cont);
+  remove_from_list(&toclean_head, cont);
 }
 
 /* Insert [cont] at the head of the toclean list. */
@@ -76,6 +142,44 @@ CAMLexport void caml_cont_ll_insert_toclean(value cont)
     Field(cont, 2) = toclean_head;        /* next = old head */
     toclean_head = cont;
   }
+}
+
+/* C-level scanning: apply a C callback to each continuation in the todo list.
+   The callback receives the continuation value and the user-provided data
+   pointer. This is safe with respect to the GC because the list heads are
+   registered global roots. We fetch the 'next' pointer before calling the
+   callback in case the callback allocates or mutates the list. */
+typedef void (*cont_cbu_t)(value cont, void *data);
+
+CAMLexport void caml_cont_ll_scan_todo_c(cont_cbu_t cb, void *data)
+{
+  prune_todo_prefix();
+
+  value cur = todo_head;
+  while (Is_block(cur)) {
+    value next = cont_next(cur);
+    cb(cur, data);
+    cur = next;
+  }
+}
+
+/* OCaml-level scanning: apply an OCaml function [f] to each continuation
+   in the todo list. The OCaml function is called with a single argument
+   (the continuation). If the OCaml call raises, the exception is propagated
+   and scanning stops. */
+CAMLexport void caml_cont_ll_scan_todo_ocaml(value f)
+{
+  CAMLparam1(f);
+  prune_todo_prefix();
+
+  value cur = todo_head;
+  while (Is_block(cur)) {
+    value next = cont_next(cur);
+    /* Use caml_callback_exn to call the closure [f] with [cur] */
+    caml_callback_exn(f, cur);
+    cur = next;
+  }
+  CAMLreturn0;
 }
 
 /* Accessors for testing/inspection from C */
@@ -94,14 +198,13 @@ CAMLexport void caml_cont_ll_print(const char *tag)
   value cur = todo_head;
   while (Is_block(cur)) {
     if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                  (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-      todo_head = Val_long(0);
+      caml_gc_log("  todo: INVALID continuation node %p (tag=%d)",
+                  (void*)cur, (int)Tag_val(cur));
       break;
     }
-    caml_gc_log("  todo: %d. cont=%p", i, (void*)cur);
-    i++;
-    cur = cont_next(cur);
+    value next = cont_next(cur);
+    caml_gc_log("  todo: cur=%p next=%p", (void*)cur, (void*)next);
+    cur = next;
   }
 
   /* Walk toclean list */
@@ -129,21 +232,18 @@ CAMLexport void caml_cont_ll_print(const char *tag)
 */
 CAMLexport void caml_cont_mark_and_shift_toclean(void)
 {
-  caml_gc_log("cont_ll: Starting mark_and_shift_toclean");
-  /* Skip over used continuations at the head to find first non-collected node */
-  while (Is_block(todo_head) && Field(todo_head, 0) == Val_long(0)) {
-    caml_gc_log("  Removing Used cont: %p", (void*)todo_head);
-    todo_head = Field(todo_head, 2);  /* move to next */
-  }
+  prune_todo_prefix();
+
   value cur = todo_head;
   value prev = Val_long(0);  /* previous node (or 0 if at head) */
-  
-  
+
+  caml_gc_log("cont_ll: Starting mark_and_shift_toclean");
+
   /* Walk through todo list */
   while (Is_block(cur)) {
     value next = cont_next(cur);
-    
-    /* Check if continuation is already used (field 0 is null) */
+
+    /* Check if continuation is already collected (field 0 is null) */
     if (Field(cur, 0) == Val_long(0)) {
       caml_gc_log("  Removing Used cont: %p", (void*)cur);
       /* Remove from todo list by skipping this node */
@@ -153,11 +253,13 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
         Field(prev, 2) = next;
       }
     } else {
-      if (!is_valid_cont(cur)) {
-        caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                    (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-        todo_head = Val_long(0);
-        break;
+      if (Is_young(cur)) {
+        /* Newly created continuation still in the minor heap; keep it in todo
+           until it is promoted so the major GC can track it normally. */
+        prev = cur;
+        caml_gc_log("  Continuation still young; keeping in todo: %p", (void*)cur);
+        cur = next;
+        continue;
       }
 
       header_t hd = Hd_val(cur);
@@ -195,15 +297,16 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
   cur = toclean_head;
   int darkened_any = 0;
   while (Is_block(cur)) {
-    if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                  (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-      toclean_head = Val_long(0);
-      break;
+    value next = is_valid_cont(cur) ? cont_next(cur) : Val_long(0);
+
+    if (!Is_young(cur) && is_valid_cont(cur)) {
+      caml_darken_cont(cur);
+      darkened_any = 1;
+    } else {
+      caml_gc_log("    Skipping young toclean cont (still minor): %p", (void*)cur);
     }
-    caml_darken_cont(cur);
-    darkened_any = 1;
-    cur = cont_next(cur);
+
+    cur = next;
   }
 
   /* Finish marking any objects that were reachable from toclean continuations.
