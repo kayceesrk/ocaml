@@ -891,7 +891,7 @@ and transl_prim_1 env p arg dbg =
   | Pperform ->
       let cont_expr =
         (* Allocate continuation with two extra fields for prev and next pointers *)
-        make_alloc dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0; int_const dbg 0; int_const dbg 0]
+        make_alloc dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0; int_const dbg 0]
       in
       let cont_id = V.create_local "cont" in
       Clet(VP.create cont_id,

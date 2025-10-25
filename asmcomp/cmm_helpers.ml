@@ -820,7 +820,7 @@ let call_cached_method obj tag cache pos args dbg =
 (* Allocation *)
 
 let make_alloc_generic ?(major=false) set_fn dbg tag wordsize args =
-  if wordsize <= Config.max_young_wosize && not major then
+  if wordsize <= Config.max_young_wosize && not major && false then
     Cop(Calloc, Cconst_natint(block_header tag wordsize, dbg) :: args, dbg)
   else begin
     let id = V.create_local "*alloc*" in

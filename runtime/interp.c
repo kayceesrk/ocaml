@@ -1357,7 +1357,7 @@ do_resume: {
       
       /* Initialize continuation fields using caml_initialize for major heap objects */
       caml_initialize(&Field(cont, 0), Val_ptr(old_stack));
-      caml_initialize(&Field(cont, 1), Val_ptr(old_stack));
+      caml_initialize(&Field(cont, 1), Val_ptr(old_stack));  /* last_fiber field - must be a stack pointer */
       /* next pointer (field 2) for singly-linked list */
       caml_initialize(&Field(cont, 2), Val_long(0));
 

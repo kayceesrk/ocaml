@@ -59,11 +59,11 @@ Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
   if (parent_stack == NULL) {
     return Val_unit;
   } else {
-    /* Allocate continuation directly in major heap with extra field for next pointer.
+    /* Allocate continuation directly in major heap with 3 fields.
        Using major heap ensures continuations are tracked by major GC for leak detection. */
     value cont = caml_alloc_shr(3, Cont_tag);
     caml_initialize(&Field(cont, 0), Val_ptr(parent_stack));
-    caml_initialize(&Field(cont, 1), Val_long(0));
+    caml_initialize(&Field(cont, 1), Val_ptr(parent_stack));  /* last_fiber field - must be a stack pointer */
     caml_initialize(&Field(cont, 2), Val_long(0)); /* next pointer for linked list */
     
     /* Register cont in the todo list so it can be processed */
