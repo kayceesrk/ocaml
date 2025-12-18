@@ -1988,6 +1988,26 @@ void caml_interrupt_all_signal_safe(void)
   }
 }
 
+/* Like caml_interrupt_all_signal_safe, but sets specific flag bits in
+   requested_external_interrupt. This allows multiple interrupt sources
+   to coexist (e.g., systhread preemption, heartbeat scheduling).
+
+   The hook can check which flag triggered by atomically reading/clearing:
+     atomic_fetch_and(&Caml_state->requested_external_interrupt, ~MY_FLAG)
+*/
+void caml_external_interrupt_all_signal_safe(uintnat flags)
+{
+  for (dom_internal *d = all_domains;
+       d < &all_domains[caml_params->max_domains];
+       d++) {
+    atomic_uintnat * interrupt_word =
+      atomic_load_acquire(&d->interruptor.interrupt_word);
+    if (interrupt_word == NULL) return;
+    atomic_fetch_or(&d->state->requested_external_interrupt, flags);
+    interrupt_domain(&d->interruptor);
+  }
+}
+
 /*  This function can be called from arbitrary code, possibly running
     concurrently with the OCaml runtime, as long as it synchronized
     with the runtime startup which initialized [all_domains] and
