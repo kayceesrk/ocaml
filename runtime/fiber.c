@@ -790,3 +790,11 @@ CAMLprim value caml_fiber_get_val(value unit)
   CAMLassert(Caml_state->current_stack);
   return Caml_state->current_stack->val;
 }
+
+/* Flush thread-local dynamic binding cache.
+   No-op in this simplified implementation without caching. */
+CAMLexport void caml_dynamic_flush_thread(dynamic_thread_t thread)
+{
+  (void)thread;
+  /* No caching in simplified implementation */
+}

@@ -293,6 +293,13 @@ CAMLnoret CAMLextern void caml_raise_unhandled_effect (value effect);
 value caml_make_unhandled_effect_exn (value effect);
 
 CAMLextern uintnat caml_live_stacks_memory(void);
+
+/* Dynamic bindings for heartbeat scheduling.
+   This is a simplified version - no per-thread caching. */
+typedef struct dynamic_thread_s *dynamic_thread_t;
+
+/* No-op for simplified implementation without caching */
+CAMLextern void caml_dynamic_flush_thread(dynamic_thread_t thread);
 CAMLextern uintnat caml_current_stack_size(void);
 
 #endif /* CAML_INTERNALS */
