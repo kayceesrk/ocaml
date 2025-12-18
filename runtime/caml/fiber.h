@@ -59,6 +59,10 @@ struct stack_info {
   size_t size; /* only used when USE_MMAP_MAP_STACK is defined */
   uintnat magic;
   int64_t id;
+
+  /* Fiber-local dynamic binding (for heartbeat scheduling) */
+  value dyn;  /* the dynamic variable bound in this fiber */
+  value val;  /* the value of the binding */
 };
 
 #define Stack_base(stk) ((value*)(stk + 1))

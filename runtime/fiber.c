@@ -211,6 +211,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->sp = (value*)hand;
   stack->exception_ptr = NULL;
   stack->id = id;
+  stack->dyn = Val_unit;  /* No dynamic binding */
+  stack->val = Val_unit;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -327,6 +329,12 @@ void caml_scan_stack(
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
     f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
 
+    /* Scan fiber-local dynamic binding */
+    if (Is_block(stack->dyn)) {
+      f(fdata, stack->dyn, &stack->dyn);
+      f(fdata, stack->val, &stack->val);
+    }
+
     stack = Stack_parent(stack);
   }
 }
@@ -427,6 +435,13 @@ void caml_scan_stack(
     if (is_scannable(fflags, Stack_handle_effect(stack)))
       f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
 
+    /* Scan fiber-local dynamic binding */
+    if (Is_block(stack->dyn) && is_scannable(fflags, stack->dyn)) {
+      f(fdata, stack->dyn, &stack->dyn);
+      if (is_scannable(fflags, stack->val))
+        f(fdata, stack->val, &stack->val);
+    }
+
     stack = Stack_parent(stack);
   }
 }
@@ -507,6 +522,9 @@ int caml_try_realloc_stack(asize_t required_space)
          stack_used * sizeof(value));
   new_stack->sp = Stack_high(new_stack) - stack_used;
   Stack_parent(new_stack) = Stack_parent(old_stack);
+  /* Copy fiber-local dynamic binding */
+  new_stack->dyn = old_stack->dyn;
+  new_stack->val = old_stack->val;
 #ifdef NATIVE_CODE
   caml_rewrite_exception_stack(old_stack, (value**)&Caml_state->exn_handler,
                               new_stack);
@@ -706,4 +724,69 @@ value caml_make_unhandled_effect_exn (value effect)
 CAMLexport void caml_raise_unhandled_effect (value effect)
 {
   caml_raise(caml_make_unhandled_effect_exn(effect));
+}
+/**** Dynamic Binding (Fiber-Local State) ****/
+
+/* Simplified implementation for heartbeat scheduling.
+ * Each fiber can have one dyn/val binding. Lookup walks the fiber stack.
+ * No per-thread caching in this simplified version. */
+
+extern value caml_fresh_oo_id(value v);
+
+/* Create a new dynamic variable with initial value */
+CAMLprim value caml_dynamic_make(value val)
+{
+  CAMLparam1(val);
+  /* Use fresh_oo_id for a unique hash */
+  value hash = caml_fresh_oo_id(Val_unit);
+  value dyn = caml_alloc_2(0, hash, val);
+  CAMLreturn(dyn);
+}
+
+#define Val_dyn(dyn) (atomic_load(Op_atomic_val(dyn) + 1))
+#define Hash_dyn(dyn) (Long_val(Field(dyn, 0)))
+
+/* Get the current value of a dynamic variable.
+ * Walks up the fiber stack looking for a binding. */
+CAMLprim value caml_dynamic_get(value dyn)
+{
+  CAMLassert(Caml_state->current_stack);
+  struct stack_info *stack = Caml_state->current_stack;
+
+  /* Walk up the fiber stack looking for a binding */
+  while (stack) {
+    if (dyn == stack->dyn) {
+      return stack->val;
+    }
+    stack = Stack_parent(stack);
+  }
+
+  /* Not bound on any fiber; return the initial value */
+  return Val_dyn(dyn);
+}
+
+/* Set a dynamic binding on the current fiber */
+CAMLprim value caml_dynamic_set(value dyn, value val)
+{
+  CAMLassert(Caml_state->current_stack);
+  struct stack_info *stack = Caml_state->current_stack;
+  stack->dyn = dyn;
+  stack->val = val;
+  return Val_unit;
+}
+
+/* Get the dyn binding from current fiber (for checking/debugging) */
+CAMLprim value caml_fiber_get_dyn(value unit)
+{
+  (void)unit;
+  CAMLassert(Caml_state->current_stack);
+  return Caml_state->current_stack->dyn;
+}
+
+/* Get the val binding from current fiber */
+CAMLprim value caml_fiber_get_val(value unit)
+{
+  (void)unit;
+  CAMLassert(Caml_state->current_stack);
+  return Caml_state->current_stack->val;
 }
