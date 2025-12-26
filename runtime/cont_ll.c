@@ -31,6 +31,10 @@
 static value todo_head = Val_long(0);
 static value toclean_head = Val_long(0);
 
+/* Guard flags to prevent re-entrant processing during GC or discontinuation */
+static int processing_mark_and_shift = 0;
+static int processing_discontinue = 0;
+
 /* Initialization: register the heads as global roots. Call at startup
    from the runtime init sequence (or from C code that uses these lists). */
 CAMLexport void caml_cont_ll_init(void)
@@ -52,12 +56,13 @@ Caml_inline value cont_next(value cont) {
 }
 
 /* Insert [cont] at the head of the todo list.
-   Skip over any already-collected continuations at the head (field 0 == 0)
+   Skip over any already-collected continuations at the head (field 0 == NULL)
    and insert before the first non-collected node. */
 CAMLexport void caml_cont_ll_insert_todo(value cont)
 { 
-  /* Skip over used continuations at the head to find first non-collected node */
-  while (Is_block(todo_head) && Field(todo_head, 0) == Val_long(0)) {
+  /* Skip over used continuations at the head to find first non-collected node.
+     Note: Field(cont, 0) is set to Val_ptr(NULL) when continuation is used. */
+  while (Is_block(todo_head) && Field(todo_head, 0) == Val_ptr(NULL)) {
     todo_head = Field(todo_head, 2);  /* move to next */
   }
 
@@ -129,9 +134,18 @@ CAMLexport void caml_cont_ll_print(const char *tag)
 */
 CAMLexport void caml_cont_mark_and_shift_toclean(void)
 {
+  /* Prevent re-entrant calls during GC or while discontinuing */
+  if (processing_mark_and_shift || processing_discontinue) {
+    caml_gc_log("cont_ll: Skipping mark_and_shift_toclean (already processing)");
+    return;
+  }
+  
+  processing_mark_and_shift = 1;
   caml_gc_log("cont_ll: Starting mark_and_shift_toclean");
-  /* Skip over used continuations at the head to find first non-collected node */
-  while (Is_block(todo_head) && Field(todo_head, 0) == Val_long(0)) {
+  
+  /* Skip over used continuations at the head to find first non-collected node.
+     Note: Field(cont, 0) is set to Val_ptr(NULL) (i.e., 0) when continuation is used. */
+  while (Is_block(todo_head) && Field(todo_head, 0) == Val_ptr(NULL)) {
     caml_gc_log("  Removing Used cont: %p", (void*)todo_head);
     todo_head = Field(todo_head, 2);  /* move to next */
   }
@@ -143,8 +157,10 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
   while (Is_block(cur)) {
     value next = cont_next(cur);
     
-    /* Check if continuation is already used (field 0 is null) */
-    if (Field(cur, 0) == Val_long(0)) {
+    /* Check if continuation is already used (field 0 is null pointer, not tagged 0).
+       When discontinue/continue is called, caml_continuation_use_noexc sets
+       Field(cont, 0) to Val_ptr(NULL), not Val_long(0). */
+    if (Field(cur, 0) == Val_ptr(NULL)) {
       caml_gc_log("  Removing Used cont: %p", (void*)cur);
       /* Remove from todo list by skipping this node */
       if (prev == Val_long(0)) {
@@ -152,12 +168,37 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
       } else {
         Field(prev, 2) = next;
       }
+    } else if (Is_long(Field(cur, 0))) {
+      /* Continuation not yet initialized by perform.
+         Check if it's still reachable - if unmarked, remove it. */
+      if (!is_valid_cont(cur)) {
+        caml_gc_log("  INVALID uninitialized cont (Dropping the entire list): %p", (void*)cur);
+        todo_head = Val_long(0);
+        processing_mark_and_shift = 0;
+        return;
+      }
+      
+      header_t hd = Hd_val(cur);
+      if (Has_status_hd(hd, caml_global_heap_state.UNMARKED)) {
+        /* Uninitialized and unreachable - remove it */
+        caml_gc_log("  Removing unreachable uninitialized cont: %p", (void*)cur);
+        if (prev == Val_long(0)) {
+          todo_head = next;
+        } else {
+          Field(prev, 2) = next;
+        }
+      } else {
+        /* Still marked/reachable, keep it for next cycle */
+        caml_gc_log("  Keeping reachable uninitialized cont: %p", (void*)cur);
+        prev = cur;
+      }
     } else {
       if (!is_valid_cont(cur)) {
         caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
                     (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
         todo_head = Val_long(0);
-        break;
+        processing_mark_and_shift = 0;
+        return;
       }
 
       header_t hd = Hd_val(cur);
@@ -196,10 +237,11 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
   int darkened_any = 0;
   while (Is_block(cur)) {
     if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
+      caml_gc_log("  INVALID node in toclean (Dropping the entire list): %p (tag=%d, wosize=%lu)",
                   (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
       toclean_head = Val_long(0);
-      break;
+      processing_mark_and_shift = 0;
+      return;
     }
     caml_darken_cont(cur);
     darkened_any = 1;
@@ -217,6 +259,7 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
   }
   
   caml_gc_log("cont_ll: Finished mark_and_shift_toclean");
+  processing_mark_and_shift = 0;
 }
 
 /* Process toclean list by calling OCaml discontinue function:
@@ -232,10 +275,25 @@ CAMLexport void caml_discontinue_toclean(void)
   CAMLparam0();
   CAMLlocal3(exn, discontinue_closure, cur);
   
+  /* Prevent re-entrant calls */
+  if (processing_discontinue) {
+    caml_gc_log("cont_ll: Skipping discontinue_toclean (already processing)");
+    CAMLreturn0;
+  }
+  
+  /* Check if there's anything to process */
+  if (!Is_block(toclean_head)) {
+    caml_gc_log("cont_ll: No continuations in toclean list");
+    CAMLreturn0;
+  }
+  
+  processing_discontinue = 1;
+  
   /* Get the discontinue function from Effect module */
   const value *discontinue_fn = caml_named_value("Effect.discontinue");
   if (discontinue_fn == NULL) {
     caml_gc_log("cont_ll: Effect.discontinue not registered");
+    processing_discontinue = 0;
     CAMLreturn0;
   }
   
@@ -256,13 +314,17 @@ CAMLexport void caml_discontinue_toclean(void)
   while (Is_block(toclean_head)) {
     cur = toclean_head;
     if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
+      caml_gc_log("  INVALID node in toclean (Dropping the entire list): %p (tag=%d, wosize=%lu)",
                   (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
       toclean_head = Val_long(0);
-      break;
+      processing_discontinue = 0;
+      CAMLreturn0;
     }
-    toclean_head = cont_next(cur);
-    Field(cur, 2) = Val_long(0);
+    
+    /* Remove from list BEFORE discontinuing to avoid dangling references */
+    value next = cont_next(cur);
+    Field(cur, 2) = Val_long(0);  /* Clear the next pointer */
+    toclean_head = next;
 
     caml_gc_log("  Discontinuing cont: %p", (void*)cur);
 
@@ -274,9 +336,17 @@ CAMLexport void caml_discontinue_toclean(void)
       caml_gc_log("  Warning: discontinue raised exception for cont %p", (void*)cur);
       /* Continue processing other continuations even if one fails */
     }
+    
+    /* After discontinue, the continuation is used (field 0 = null).
+       Clear our local reference before the next iteration. */
+    cur = Val_long(0);
   }
 
+  /* Ensure the list head is properly terminated */
+  toclean_head = Val_long(0);
+  
   caml_gc_log("cont_ll: Finished discontinuing toclean list");
+  processing_discontinue = 0;
   CAMLreturn0;
 }
 
