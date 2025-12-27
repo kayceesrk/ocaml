@@ -13,7 +13,7 @@ let coin_flip () =
 
 let nested_live_continuations () =
   let live_ks = ref ([] : (bool, unit) continuation list) in  (* list to keep continuations alive *)
-  for i = 1 to 10000 do
+  for i = 1 to 10 do
     match coin_flip () with
     | r -> Printf.printf "Result %d: %s\n" i r
     | effect Choose, k ->

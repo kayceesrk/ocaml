@@ -30,7 +30,8 @@ let foo l =
 let bar i = foo [i]
 
 let () =
-  for _ = 1 to 10_000 do
+  for _ = 1 to 100000 do
     try bar 8
     with Unhandled _ -> ()
-  done
+  done;
+  Gc.full_major()

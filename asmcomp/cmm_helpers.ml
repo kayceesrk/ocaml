@@ -819,8 +819,8 @@ let call_cached_method obj tag cache pos args dbg =
 
 (* Allocation *)
 
-let make_alloc_generic ?(major=false) set_fn dbg tag wordsize args =
-  if wordsize <= Config.max_young_wosize && not major && false then
+let make_alloc_generic set_fn dbg tag wordsize args =
+  if wordsize <= Config.max_young_wosize then
     Cop(Calloc, Cconst_natint(block_header tag wordsize, dbg) :: args, dbg)
   else begin
     let id = V.create_local "*alloc*" in
@@ -834,12 +834,12 @@ let make_alloc_generic ?(major=false) set_fn dbg tag wordsize args =
          fill_fields 1 args)
   end
 
- let make_alloc dbg tag args =
+let make_alloc dbg tag args =
   let addr_array_init arr ofs newval dbg =
     Cop(Cextcall("caml_initialize", typ_void, [], false),
         [array_indexing log2_size_addr arr ofs dbg; newval], dbg)
   in
-  make_alloc_generic ~major:(tag = Obj.cont_tag) addr_array_init dbg tag (List.length args) args
+  make_alloc_generic addr_array_init dbg tag (List.length args) args
 
 let make_float_alloc dbg tag args =
   make_alloc_generic float_array_set dbg tag

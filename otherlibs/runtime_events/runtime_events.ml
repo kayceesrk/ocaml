@@ -88,6 +88,7 @@ type runtime_phase =
 | EV_MINOR_REMEMBERED_SET
 | EV_MINOR_REMEMBERED_SET_PROMOTE
 | EV_MINOR_LOCAL_ROOTS_PROMOTE
+| EV_MINOR_CONT_PROCESS
 | EV_DOMAIN_CONDITION_WAIT
 | EV_DOMAIN_RESIZE_HEAP_RESERVATION
 | EV_COMPACT
@@ -95,6 +96,7 @@ type runtime_phase =
 | EV_COMPACT_FORWARD
 | EV_COMPACT_RELEASE
 | EV_EMPTY_MINOR
+| EV_MINOR_EPHE_CLEAN
 
 type lifecycle =
   EV_RING_START
@@ -198,6 +200,7 @@ let runtime_phase_name phase =
   | EV_MINOR_REMEMBERED_SET -> "minor_remembered_set"
   | EV_MINOR_REMEMBERED_SET_PROMOTE -> "minor_remembered_set_promote"
   | EV_MINOR_LOCAL_ROOTS_PROMOTE -> "minor_local_roots_promote"
+  | EV_MINOR_CONT_PROCESS -> "minor_cont_process"
   | EV_DOMAIN_CONDITION_WAIT -> "domain_condition_wait"
   | EV_MAJOR_FINISH_CYCLE -> "major_finish_cycle"
   | EV_DOMAIN_RESIZE_HEAP_RESERVATION -> "domain_resize_heap_reservation"
@@ -206,6 +209,7 @@ let runtime_phase_name phase =
   | EV_COMPACT_FORWARD -> "compaction_forward"
   | EV_COMPACT_RELEASE -> "compaction_release"
   | EV_EMPTY_MINOR -> "empty_minor"
+  | EV_MINOR_EPHE_CLEAN -> "minor_ephe_clean"
 
 let lifecycle_name lifecycle =
   match lifecycle with
