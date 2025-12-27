@@ -22,6 +22,7 @@
 #include "caml/domain.h"
 #include "caml/shared_heap.h"
 #include "caml/major_gc.h"
+#include "caml/fiber.h"
 
 /* Heads of the two lists. Only [toclean_head] is registered as a global root
   so we can keep those continuations alive until we run discontinue on them.
@@ -157,42 +158,26 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
   while (Is_block(cur)) {
     value next = cont_next(cur);
     
-    /* Check if continuation is already used (field 0 is null pointer, not tagged 0).
-       When discontinue/continue is called, caml_continuation_use_noexc sets
-       Field(cont, 0) to Val_ptr(NULL), not Val_long(0). */
-    if (Field(cur, 0) == Val_ptr(NULL)) {
-      caml_gc_log("  Removing Used cont: %p", (void*)cur);
+    /* Check if continuation is used or uninitialized.
+       - Used: Field(0) = Val_ptr(NULL) = 1 (set by caml_continuation_use_noexc)
+       - Uninitialized: Field(0) = Val_long(0) = 1 (initial allocation value)
+       Both cases result in Field(0) == 1, so we check for that.
+       
+       Note: Valid stack pointers are stored as Val_ptr(stack) = stack + 1,
+       which will be > 1 for any non-NULL stack pointer. */
+    value field0 = Field(cur, 0);
+    
+    if (field0 == Val_ptr(NULL)) {
+      /* Used or uninitialized (both have field0 == 1) */
+      caml_gc_log("  Removing Used/uninitialized cont: %p", (void*)cur);
       /* Remove from todo list by skipping this node */
       if (prev == Val_long(0)) {
         todo_head = next;
       } else {
         Field(prev, 2) = next;
       }
-    } else if (Is_long(Field(cur, 0))) {
-      /* Continuation not yet initialized by perform.
-         Check if it's still reachable - if unmarked, remove it. */
-      if (!is_valid_cont(cur)) {
-        caml_gc_log("  INVALID uninitialized cont (Dropping the entire list): %p", (void*)cur);
-        todo_head = Val_long(0);
-        processing_mark_and_shift = 0;
-        return;
-      }
-      
-      header_t hd = Hd_val(cur);
-      if (Has_status_hd(hd, caml_global_heap_state.UNMARKED)) {
-        /* Uninitialized and unreachable - remove it */
-        caml_gc_log("  Removing unreachable uninitialized cont: %p", (void*)cur);
-        if (prev == Val_long(0)) {
-          todo_head = next;
-        } else {
-          Field(prev, 2) = next;
-        }
-      } else {
-        /* Still marked/reachable, keep it for next cycle */
-        caml_gc_log("  Keeping reachable uninitialized cont: %p", (void*)cur);
-        prev = cur;
-      }
     } else {
+      /* Has a valid stack pointer (field0 = Val_ptr(stack) where stack != NULL) */
       if (!is_valid_cont(cur)) {
         caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
                     (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
@@ -447,9 +432,15 @@ CAMLexport void caml_cont_ll_process_minor_todo(
   
   while (Is_block(cur)) {
     /* We must ALWAYS save the next pointer from the minor heap location
-       before doing anything else, because promotion can change the memory */
+       before doing anything else, because promotion can change the memory.
+       
+       IMPORTANT: For forwarded blocks (header == 0), is_valid_cont() returns
+       false because Tag_val returns 0. But Field(2) still contains the original
+       next pointer in the minor heap, so we must read it anyway! */
     value next_in_minor = Val_long(0);
-    if (is_young(cur) && is_valid_cont(cur)) {
+    if (is_young(cur)) {
+      /* For minor heap blocks, always try to read Field(2) as the next pointer.
+         Even if the block is forwarded, Field(2) is preserved. */
       next_in_minor = Field(cur, 2);
     }
     
@@ -469,21 +460,25 @@ CAMLexport void caml_cont_ll_process_minor_todo(
       value forwarded = Field(cur, 0);
       caml_gc_log("  cont_ll_minor: Cont %p forwarded to %p", (void*)cur, (void*)forwarded);
       
-      /* The forwarded continuation is in major heap, add to major todo ONCE */
+      /* The forwarded continuation is in major heap, add to major todo */
       if (Is_block(forwarded) && is_valid_cont(forwarded) && 
           Field(forwarded, 0) != Val_ptr(NULL)) {
         caml_cont_ll_insert_todo(forwarded);
       }
       
-      /* Move to next using the saved minor heap pointer */
-      if (Is_block(next_in_minor) && is_young(next_in_minor)) {
-        /* Check if next was also forwarded */
-        if (Hd_val(next_in_minor) == 0) {
-          cur = Field(next_in_minor, 0);  /* Follow its forwarding pointer */
-        } else {
+      /* Move to next using the saved minor heap pointer.
+         The next pointer in minor heap still points to the next minor block. */
+      if (Is_block(next_in_minor)) {
+        if (is_young(next_in_minor)) {
+          /* Next is still in minor heap (may or may not be forwarded) */
           cur = next_in_minor;
+        } else {
+          /* Next is already in major heap - shouldn't happen normally */
+          caml_gc_log("  cont_ll_minor: next_in_minor %p is in major heap, stopping", (void*)next_in_minor);
+          break;
         }
       } else {
+        /* End of list (Val_long(0)) */
         cur = next_in_minor;
       }
       continue;
@@ -496,50 +491,75 @@ CAMLexport void caml_cont_ll_process_minor_todo(
       continue;
     }
     
-    /* Check if continuation was used (field 0 is NULL pointer) */
+    /* Check if continuation was used or uninitialized (field 0 == Val_ptr(NULL) == 1) */
     if (Field(cur, 0) == Val_ptr(NULL)) {
-      caml_gc_log("  cont_ll_minor: Used cont %p, skipping", (void*)cur);
-      /* Move to next using saved pointer */
-      if (Is_block(next_in_minor) && is_young(next_in_minor) && Hd_val(next_in_minor) == 0) {
-        cur = Field(next_in_minor, 0);
-      } else {
-        cur = next_in_minor;
-      }
+      caml_gc_log("  cont_ll_minor: Used/uninitialized cont %p, skipping", (void*)cur);
+      cur = next_in_minor;
       continue;
     }
     
     /* Still in minor heap and not forwarded - this is unreachable!
-       Promote it and add to toclean list.
+       We need to promote it to major heap and add to toclean for discontinue.
        
-       We use the oldify function to promote the continuation and its stack.
-       This will also handle any objects reachable from the stack. */
-    caml_gc_log("  cont_ll_minor: Unreachable cont %p, promoting to toclean", (void*)cur);
+       IMPORTANT: We must validate the stack before promoting. The stack
+       might be invalid (corrupted, already freed, etc.) for some unreachable
+       continuations (e.g., from unhandled effects that crashed). 
+       
+       If the stack is invalid, we skip the continuation and let it be
+       garbage collected - we cannot safely discontinue it anyway. */
+    value stack_value = Field(cur, 0);
+    struct stack_info* stk = Ptr_val(stack_value);
     
-    /* Check if the continuation has a valid field 0 (stack pointer).
-       If it's uninitialized (Val_long(0)) or invalid, skip it.
-       Unhandled effect continuations might be in this state. */
-    value stack_field = Field(cur, 0);
-    if (Is_long(stack_field)) {
-      /* Field 0 is an integer (likely 0) - continuation was never initialized.
-         This can happen with unhandled effects. Skip it. */
-      caml_gc_log("  cont_ll_minor: Continuation %p has uninitialized stack field (0x%lx), skipping",
-                  (void*)cur, (unsigned long)stack_field);
-      /* Move to next */
-      if (Is_block(next_in_minor) && is_young(next_in_minor)) {
-        if (Hd_val(next_in_minor) == 0) {
-          cur = Field(next_in_minor, 0);
-        } else {
-          cur = next_in_minor;
-        }
-      } else {
-        cur = next_in_minor;
-      }
+    /* Validate the stack pointer */
+    if (stk == NULL) {
+      caml_gc_log("  cont_ll_minor: Unreachable cont %p has NULL stack, skipping", (void*)cur);
+      cur = next_in_minor;
       continue;
     }
     
+    /* CRITICAL: Check if this stack is the current execution stack!
+       
+       For unhandled effects, a continuation is allocated pointing to the
+       current stack, then an exception is raised. The continuation appears
+       unreachable but its stack is actually the live execution stack.
+       
+       We must NOT try to discontinue or free the current stack! */
+    caml_domain_state* domain_state = (caml_domain_state*)domain_ptr;
+    if (stk == domain_state->current_stack) {
+      caml_gc_log("  cont_ll_minor: Unreachable cont %p points to current stack, skipping", (void*)cur);
+      cur = next_in_minor;
+      continue;
+    }
+    
+    /* Also check if it's a parent of the current stack */
+    int is_parent_stack = 0;
+    struct stack_info* check = domain_state->current_stack;
+    while (check != NULL) {
+      if (Stack_parent(check) == stk) {
+        is_parent_stack = 1;
+        break;
+      }
+      check = Stack_parent(check);
+    }
+    if (is_parent_stack) {
+      caml_gc_log("  cont_ll_minor: Unreachable cont %p points to parent stack, skipping", (void*)cur);
+      cur = next_in_minor;
+      continue;
+    }
+    
+    /* Check stack magic number for validity */
+    if (stk->magic != 42) {
+      caml_gc_log("  cont_ll_minor: Unreachable cont %p has invalid stack (magic=%lu), skipping", 
+                  (void*)cur, (unsigned long)stk->magic);
+      cur = next_in_minor;
+      continue;
+    }
+    
+    caml_gc_log("  cont_ll_minor: Unreachable cont %p with valid stack %p, promoting to toclean", 
+                (void*)cur, (void*)stk);
+    
     /* Promote the continuation using oldify_fn.
-       This will allocate in major heap, set up forwarding, and recursively
-       promote the linked list chain. */
+       This will allocate in major heap, set up forwarding, and scan the stack. */
     volatile value promoted_cont = Val_long(0);
     oldify_fn(oldify_state, cur, &promoted_cont);
     
@@ -550,29 +570,9 @@ CAMLexport void caml_cont_ll_process_minor_todo(
       caml_cont_ll_insert_toclean(promoted_cont);
     }
     
-    /* Move to next using the saved minor heap pointer.
-       The next continuation may have been promoted recursively, so check. */
-    if (Is_block(next_in_minor) && is_young(next_in_minor)) {
-      if (Hd_val(next_in_minor) == 0) {
-        /* Next was forwarded (promoted), follow forwarding pointer */
-        cur = Field(next_in_minor, 0);
-        /* But since it was promoted as part of the chain, we should
-           actually add it to major todo and stop following the chain
-           to avoid duplicates */
-        if (Is_block(cur) && is_valid_cont(cur) && Field(cur, 0) != Val_ptr(NULL)) {
-          caml_gc_log("  cont_ll_minor: Next in chain was promoted to %p, adding to major todo", (void*)cur);
-          caml_cont_ll_insert_todo(cur);
-        }
-        /* Stop following this chain since it was all promoted together */
-        break;
-      } else {
-        /* Next is still in minor heap, continue processing */
-        cur = next_in_minor;
-      }
-    } else {
-      /* End of list */
-      cur = next_in_minor;
-    }
+    /* Move to next. After promotion, next_in_minor still points to the 
+       original minor heap address. */
+    cur = next_in_minor;
   }
   
   /* Clear the minor todo list since all continuations have been processed */
