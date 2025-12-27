@@ -896,14 +896,12 @@ and transl_prim_1 env p arg dbg =
       let cont_id = V.create_local "cont" in
       Clet(VP.create cont_id,
            cont_expr,
-           Csequence(
-             (* Insert the new continuation into the minor todo list.
-                Continuations are allocated in the minor heap first. *)
-             Cop(Cextcall("caml_cont_ll_insert_minor_todo", typ_void, [], false), [Cvar cont_id], dbg),
-             Cop(Capply typ_val,
-                 [Cconst_symbol ("caml_perform", dbg); transl env arg; Cvar cont_id],
-                 dbg)
-           ))
+           (* Note: caml_perform will call caml_cont_ll_insert_minor_todo internally
+              after initializing the continuation fields. We removed the insert here
+              because at this point the continuation is not yet initialized. *)
+           Cop(Capply typ_val,
+               [Cconst_symbol ("caml_perform", dbg); transl env arg; Cvar cont_id],
+               dbg))
   | Pdls_get ->
       Cop(Cdls_get, [transl env arg], dbg)
   | Ppoll ->

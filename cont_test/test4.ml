@@ -13,7 +13,7 @@ let coin_flip () =
 
 let nested_live_continuations () =
   let live_ks = ref ([] : (bool, unit) continuation list) in  (* list to keep continuations alive *)
-  for i = 1 to 10000 do
+  for i = 1 to 100000 do
     match coin_flip () with
     | r -> Printf.printf "Result %d: %s\n%!" i r
     | effect Choose, k ->
@@ -22,6 +22,7 @@ let nested_live_continuations () =
   done;
   (* All continuations are now in live_ks, so they remain live *)
   Printf.printf "All continuations captured and kept alive. Calling Gc.full_major()...\n%!";
+  Gc.full_major ();
   List.iteri (fun j k ->
     let original_i = List.length !live_ks - j in
     let value_to_pass = (original_i mod 2 = 0) in
@@ -35,7 +36,7 @@ let nested_live_continuations () =
         Printf.printf "Ignoring continuation (originally captured at i=%d) with value %b\n%!" original_i value_to_pass;
       end
   ) !live_ks;
-  Gc.minor ();
+  Gc.full_major ();
   Printf.printf "Full major GC completed. Continuations should be in the LL.\n%!"
 
 let () =

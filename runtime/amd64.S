@@ -1091,7 +1091,22 @@ CFI_STARTPROC
         %rbx: freshly allocated continuation */
         movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
         leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
-        movq    %rdi, 0(%rbx) /* Initialise continuation */
+        movq    %rdi, 0(%rbx) /* Initialise continuation Field(0) */
+        movq    %rdi, 8(%rbx) /* Initialise continuation Field(1) (last_fiber) */
+        /* Insert the fully-initialized continuation into the minor todo list.
+           We must do this AFTER initializing Field(0) and Field(1) above.
+           Only do this for initial perform, not reperform (which jumps to do_perform).
+           Save registers that will be clobbered by C call. */
+        pushq   %rax; CFI_ADJUST(8)
+        pushq   %rdi; CFI_ADJUST(8)
+        pushq   %rsi; CFI_ADJUST(8)
+        movq    %rbx, C_ARG_1  /* arg 1: continuation */
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_cont_ll_insert_minor_todo))
+        SWITCH_C_TO_OCAML
+        popq    %rsi; CFI_ADJUST(-8)
+        popq    %rdi; CFI_ADJUST(-8)
+        popq    %rax; CFI_ADJUST(-8)
 LBL(do_perform):
     /*  %rdi: last_fiber
         %rsi: old stack */
@@ -1107,7 +1122,6 @@ LBL(do_perform):
         TSAN_RESTORE_CALLER_REGS
         LEAVE_FUNCTION
 #endif
-        movq    %rdi, 8(%rbx) /* Set the last fiber field in the continuation */
         movq    Stack_handler(%rsi), %r11  /* %r11 := old stack -> handler */
         movq    Handler_parent(%r11), %r10 /* %r10 := parent stack */
         cmpq    $0, %r10                   /* parent is NULL? */

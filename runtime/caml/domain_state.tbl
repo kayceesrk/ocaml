@@ -203,5 +203,15 @@ DOMAIN_STATE(struct caml_exception_context*, external_raise)
 DOMAIN_STATE(struct memprof_domain_s *, memprof)
 DOMAIN_STATE(value *, memprof_young_trigger)
 
+/* Continuation linked lists for GC tracking */
+DOMAIN_STATE(value, cont_todo_head)
+/* Head of the todo list - continuations to be processed during major GC */
+
+DOMAIN_STATE(value, cont_toclean_head)
+/* Head of the toclean list - unreachable continuations awaiting discontinue */
+
+DOMAIN_STATE(value, cont_minor_todo_head)
+/* Head of the minor todo list - minor heap continuations to be processed */
+
 DOMAIN_STATE(extra_params_area, extra_params)
 /* This member must occur last, because it is an array, not a scalar */
