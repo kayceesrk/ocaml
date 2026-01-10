@@ -101,13 +101,24 @@ static void print_symbol(const char* symbol, const regmatch_t* match)
   regoff_t off = match->rm_so;
   regoff_t len = match->rm_eo - match->rm_so;
 
+#if defined(__APPLE__)
+  /* Replace $ with . to normalize symbol names across platforms.
+     None of the examples require escaping so we can safely
+     replace just the character.
+  */
+  for (regoff_t i = 0; i < len; i++) {
+    char c = symbol[off + i];
+    fputc(c == '$' ? '.' : c, stdout);
+  }
+  fputc('\n', stdout);
+#else
   fprintf(stdout, "%.*s\n", (int)len, symbol + off);
+#endif
   fflush(stdout);
 }
 
-void fp_backtrace(value argv0)
+void fp_backtrace(CAMLunused value argv0)
 {
-  const char* execname = String_val(argv0);
   const char* symbol = NULL;
 
   for (struct frame_info *fi = __builtin_frame_address(0), *next = NULL;

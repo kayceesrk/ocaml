@@ -228,7 +228,7 @@ let mod_prim = Lambda.transl_prim "CamlinternalMod"
 let undefined_location loc =
   let (fname, line, char) = Location.get_pos_info loc.Location.loc_start in
   Lconst(Const_block(0,
-                     [Const_base(Const_string (fname, loc, None));
+                     [Const_immstring fname;
                       const_int line;
                       const_int char]))
 
@@ -1418,8 +1418,7 @@ let toploop_getvalue id =
     ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Mutable),
                   [Lprim(Pgetglobal toploop_ident, [], Loc_unknown)],
                   Loc_unknown);
-    ap_args=[Lconst(Const_base(
-      Const_string (toplevel_name id, Location.none, None)))];
+    ap_args=[Lconst(Const_immstring (toplevel_name id))];
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inline;
     ap_specialised=Default_specialise;
@@ -1432,8 +1431,7 @@ let toploop_setvalue id lam =
                   [Lprim(Pgetglobal toploop_ident, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
-      [Lconst(Const_base(
-         Const_string(toplevel_name id, Location.none, None)));
+      [Lconst(Const_immstring (toplevel_name id));
        lam];
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inline;
@@ -1670,7 +1668,7 @@ let get_relative_path top_module path =
   let comps = collect_components path in
   let comps =
     match comps with
-    | h :: t when h = top_module -> t
+    | h :: (_ :: _ as t) when h = top_module -> t
     | _ -> comps
   in
   String.concat "." comps

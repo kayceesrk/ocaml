@@ -104,10 +104,14 @@ module Error = struct
 
   and signature_symptom = {
     env: Env.t;
+    subst: Subst.t;
+    sig1: signature;
+    sig2: signature;
     missings: signature_item list;
-    incompatibles: (Ident.t * sigitem_symptom) list;
+    incompatibles: (signature_item * sigitem_symptom) list;
     oks: (int * module_coercion) list;
-    leftovers: (signature_item * signature_item * int) list;
+    additions: signature_item list;
+    untypables: (signature_item * signature_item * int) list;
   }
   and sigitem_symptom =
     | Core of core_sigitem_symptom
@@ -152,8 +156,8 @@ module Directionality = struct
     | Strictly_positive
       (** Strictly positive positions are notable for tools since they are the
           the case where we match a implementation definition with an interface
-          declaration. Oherwise in the positive case we are matching
-          declatations inside functor arguments at even level of nesting.*)
+          declaration. Otherwise in the positive case we are matching
+          declarations inside functor arguments at even level of nesting.*)
     | Positive
     | Negative
 
@@ -461,8 +465,8 @@ module Sign_diff = struct
     runtime_coercions: (int * Typedtree.module_coercion) list;
     shape_map: Shape.Map.t;
     deep_modifications:bool;
-    errors: (Ident.t * Error.sigitem_symptom) list;
-    leftovers: ((Types.signature_item as 'it) * 'it * int) list
+    errors: (signature_item * Error.sigitem_symptom) list;
+    untypables: ((Types.signature_item as 'it) * 'it * int) list;
   }
 
   let empty = {
@@ -470,7 +474,7 @@ module Sign_diff = struct
     shape_map = Shape.Map.empty;
     deep_modifications = false;
     errors = [];
-    leftovers = []
+    untypables = [];
   }
 
   let merge x y =
@@ -481,7 +485,7 @@ module Sign_diff = struct
           the last shape map contains all previous elements. *)
       deep_modifications = x.deep_modifications || y.deep_modifications;
       errors = x.errors @ y.errors;
-      leftovers = x.leftovers @ y.leftovers
+      untypables = x.untypables @ y.untypables;
     }
 end
 
@@ -503,6 +507,12 @@ type core_relation = {
   class_type_declarations: Types.class_type_declaration core_incl;
 }
 
+let item_subst id1 item2 subst =
+  match item2 with
+  | Sig_type (id2,_,_,_) -> Subst.add_type id2 (Path.Pident id1) subst
+  | Sig_module (id2,_,_,_,_) -> Subst.add_module id2 (Path.Pident id1) subst
+  | Sig_modtype (id2,_,_) -> Subst.add_modtype id2 (Path.Pident id1) subst
+  | Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _ -> subst
 
 let rec modtypes ~core ~direction ~loc env subst mty1 mty2 shape =
   match try_modtypes ~core ~direction ~loc env subst mty1 mty2 shape with
@@ -734,7 +744,7 @@ and signatures ~core ~direction ~loc env subst sig1 sig2 mod_shape =
      Return a coercion list indicating, for all run-time components
      of sig2, the position of the matching run-time components of sig1
      and the coercion to be applied to it. *)
-  let rec pair_components ~core subst paired unpaired = function
+  let rec pair_components ~core subst paired unpaired additions = function
       [] ->
         let open Sign_diff in
         let d =
@@ -742,7 +752,7 @@ and signatures ~core ~direction ~loc env subst sig1 sig2 mod_shape =
             mod_shape Shape.Map.empty
             (List.rev paired)
         in
-        begin match unpaired, d.errors, d.runtime_coercions, d.leftovers with
+        begin match unpaired, d.errors, d.runtime_coercions, d.untypables with
             | [], [], cc, [] ->
                 let shape =
                   if not d.deep_modifications && exported_len1 = exported_len2
@@ -753,17 +763,22 @@ and signatures ~core ~direction ~loc env subst sig1 sig2 mod_shape =
                   Ok (simplify_structure_coercion cc id_pos_list, shape)
                 else
                   Ok (Tcoerce_structure (cc, id_pos_list), shape)
-            | missings, incompatibles, runtime_coercions, leftovers ->
+            | missings, incompatibles, runtime_coercions, untypables ->
+                let additions = additions |> FieldMap.to_list |> List.map snd in
                 Error {
                   Error.env=new_env;
+                  subst;
+                  sig1;
+                  sig2;
                   missings;
                   incompatibles;
                   oks=runtime_coercions;
-                  leftovers;
+                  additions;
+                  untypables;
                 }
         end
     | item2 :: rem ->
-        let (id2, _loc, name2) = item_ident_name item2 in
+        let (_id2, _loc, name2) = item_ident_name item2 in
         let name2, report =
           match item2, name2 with
             Sig_type (_, {type_manifest=None}, _, _), {name=s; kind=Field_type}
@@ -776,29 +791,20 @@ and signatures ~core ~direction ~loc env subst sig1 sig2 mod_shape =
         in
         begin match FieldMap.find name2 comps1 with
         | (id1, item1, pos1) ->
-          let new_subst =
-            match item2 with
-              Sig_type _ ->
-                Subst.add_type id2 (Path.Pident id1) subst
-            | Sig_module _ ->
-                Subst.add_module id2 (Path.Pident id1) subst
-            | Sig_modtype _ ->
-                Subst.add_modtype id2 (Path.Pident id1) subst
-            | Sig_value _ | Sig_typext _
-            | Sig_class _ | Sig_class_type _ ->
-                subst
-          in
+          let updated_additions = FieldMap.remove name2 additions in
+          let new_subst = item_subst id1 item2 subst in
           pair_components ~core new_subst
-            ((item1, item2, pos1) :: paired) unpaired rem
+            ((item1, item2, pos1) :: paired) unpaired updated_additions rem
         | exception Not_found ->
           let unpaired =
             if report then
               item2 :: unpaired
             else unpaired in
-          pair_components ~core subst paired unpaired rem
+          pair_components ~core subst paired unpaired additions rem
         end in
   (* Do the pairing and checking, and return the final coercion *)
-  pair_components ~core subst [] [] sig2
+  let additions = FieldMap.map (fun (_, item, _) -> item) comps1 in
+  pair_components ~core subst [] [] additions sig2
 
 (* Inclusion between signature components *)
 
@@ -808,9 +814,9 @@ and signature_components ~core ~direction ~loc old_env env subst
   | [] -> Sign_diff.{ empty with shape_map }
   | (sigi1, sigi2, pos) :: rem ->
       let shape_modified = ref false in
-      let id, item, paired_uids, shape_map, present_at_runtime =
+      let item, paired_uids, shape_map, present_at_runtime =
         match sigi1, sigi2 with
-        | Sig_value(id1, valdecl1, _) ,Sig_value(_id2, valdecl2, _) ->
+        | Sig_value(id1, valdecl1, _), Sig_value(_id2, valdecl2, _) ->
             let item =
               core.value_descriptions ~loc ~direction env subst id1
                 valdecl1 valdecl2
@@ -822,7 +828,7 @@ and signature_components ~core ~direction ~loc old_env env subst
             in
             let shape_map = Shape.Map.add_value_proj shape_map id1 orig_shape in
             let paired_uids = (valdecl1.val_uid, valdecl2.val_uid) in
-            id1, item, paired_uids, shape_map, present_at_runtime
+            item, paired_uids, shape_map, present_at_runtime
         | Sig_type(id1, tydec1, _, _), Sig_type(_id2, tydec2, _, _) ->
             let item =
               core.type_declarations ~loc ~direction env subst id1 tydec1 tydec2
@@ -831,7 +837,7 @@ and signature_components ~core ~direction ~loc old_env env subst
             (* Right now we don't filter hidden constructors / labels from the
             shape. *)
             let shape_map = Shape.Map.add_type_proj shape_map id1 orig_shape in
-            id1, item, (tydec1.type_uid, tydec2.type_uid), shape_map, false
+            item, (tydec1.type_uid, tydec2.type_uid), shape_map, false
         | Sig_typext(id1, ext1, _, _), Sig_typext(_id2, ext2, _, _) ->
             let item =
               core.extension_constructors ~loc ~direction env subst id1
@@ -841,7 +847,7 @@ and signature_components ~core ~direction ~loc old_env env subst
             let shape_map =
               Shape.Map.add_extcons_proj shape_map id1 orig_shape
             in
-            id1, item, (ext1.ext_uid, ext2.ext_uid), shape_map, true
+            item, (ext1.ext_uid, ext2.ext_uid), shape_map, true
         | Sig_module(id1, pres1, mty1, _, _), Sig_module(_, pres2, mty2, _, _)
           -> begin
               let orig_shape =
@@ -874,7 +880,7 @@ and signature_components ~core ~direction ~loc old_env env subst
               in
               let item = mark_error_as_unrecoverable item in
               let paired_uids = (mty1.md_uid, mty2.md_uid) in
-              id1, item, paired_uids, shape_map, present_at_runtime
+              item, paired_uids, shape_map, present_at_runtime
             end
         | Sig_modtype(id1, info1, _), Sig_modtype(_id2, info2, _) ->
             let item =
@@ -884,7 +890,7 @@ and signature_components ~core ~direction ~loc old_env env subst
               Shape.Map.add_module_type_proj shape_map id1 orig_shape
             in
             let item = mark_error_as_unrecoverable item in
-            id1, item, (info1.mtd_uid, info2.mtd_uid), shape_map, false
+            item, (info1.mtd_uid, info2.mtd_uid), shape_map, false
         | Sig_class(id1, decl1, _, _), Sig_class(_id2, decl2, _, _) ->
             let item =
               core.class_declarations ~loc ~direction env subst id1 decl1 decl2
@@ -893,7 +899,7 @@ and signature_components ~core ~direction ~loc old_env env subst
               Shape.Map.add_class_proj shape_map id1 orig_shape
             in
             let item = mark_error_as_unrecoverable item in
-            id1, item, (decl1.cty_uid, decl2.cty_uid), shape_map, true
+            item, (decl1.cty_uid, decl2.cty_uid), shape_map, true
         | Sig_class_type(id1, info1, _, _), Sig_class_type(_id2, info2, _, _) ->
             let item =
               core.class_type_declarations ~loc ~direction env subst id1
@@ -903,7 +909,7 @@ and signature_components ~core ~direction ~loc old_env env subst
             let shape_map =
               Shape.Map.add_class_type_proj shape_map id1 orig_shape
             in
-            id1, item, (info1.clty_uid, info2.clty_uid), shape_map, false
+            item, (info1.clty_uid, info2.clty_uid), shape_map, false
         | _ ->
             assert false
       in
@@ -935,7 +941,7 @@ and signature_components ~core ~direction ~loc old_env env subst
             in
             Sign_diff.{ empty with deep_modifications; runtime_coercions }
         | Error { error; recoverable=_ } ->
-            Sign_diff.{ empty with errors=[id,error]; deep_modifications }
+            Sign_diff.{ empty with errors=[sigi1,error]; deep_modifications }
       in
       let continue = match item with
         | Ok _ -> true
@@ -945,11 +951,11 @@ and signature_components ~core ~direction ~loc old_env env subst
         if continue then
           signature_components ~core ~direction ~loc old_env env subst
             orig_shape shape_map rem
-        else Sign_diff.{ empty with leftovers=rem }
+        else Sign_diff.{ empty with untypables=rem }
        in
        Sign_diff.merge first rest
 
-and module_declarations ~direction ~loc env  subst id1 md1 md2 orig_shape =
+and module_declarations ~loc env ~direction subst id1 md1 md2 orig_shape =
   Builtin_attributes.check_alerts_inclusion
     ~def:md1.md_loc
     ~use:md2.md_loc
@@ -964,7 +970,7 @@ and module_declarations ~direction ~loc env  subst id1 md1 md2 orig_shape =
 
 (* Inclusion between module type specifications *)
 
-and modtype_infos ~core ~direction ~loc env subst id info1 info2 =
+and modtype_infos ~core ~loc env ~direction subst id info1 info2 =
   Builtin_attributes.check_alerts_inclusion
     ~def:info1.mtd_loc
     ~use:info2.mtd_loc
@@ -1203,7 +1209,8 @@ module Functor_inclusion_diff = struct
         in
         expand_params { st with env; subst }
 
-  let diff env (l1,res1) (l2,_) =
+  type inclusion_env = { i_env:Env.t; i_subst:Subst.t }
+  let diff {i_env=env; i_subst=subst} (l1,res1) (l2,_) =
     let module Compute = Diff.Left_variadic(struct
         let test st mty1 mty2 =
           let loc = Location.none in
@@ -1220,7 +1227,7 @@ module Functor_inclusion_diff = struct
     let param1 = Array.of_list l1 in
     let param2 = Array.of_list l2 in
     let state =
-      { env; subst = Subst.identity; res = keep_expansible_param res1}
+      { env; subst; res = keep_expansible_param res1}
     in
     Compute.diff state param1 param2
 
@@ -1356,18 +1363,18 @@ let modtypes ~loc env ~mark mty1 mty2 =
   | Ok (cc, _) -> cc
   | Error reason -> raise (Error (env, Error.(In_Module_type reason)))
 
-let gen_signatures env ~direction sig1 sig2 =
+let gen_signatures env ?(subst=Subst.identity) ~direction sig1 sig2 =
   match
     signatures
       ~core:core_inclusion ~direction ~loc:Location.none env
-      Subst.identity sig1 sig2 Shape.dummy_mod
+      subst sig1 sig2 Shape.dummy_mod
   with
   | Ok (cc, _) -> cc
   | Error reason -> raise (Error(env,Error.(In_Signature reason)))
 
-let signatures env ~mark sig1 sig2 =
+let signatures env ?subst ~mark sig1 sig2 =
   let direction = Directionality.unknown ~mark in
-  gen_signatures env ~direction sig1 sig2
+  gen_signatures env ?subst ~direction sig1 sig2
 
 let check_implementation env impl intf =
   let direction =
@@ -1409,3 +1416,32 @@ let check_modtype_equiv ~loc env id mty1 mty2 =
       raise (Error(env,
                    Error.(In_Module_type_substitution (id,diff mty1 mty2 e)))
             )
+
+module Check = struct
+  type 'a compatibility_test = Env.t -> Subst.t -> 'a -> 'a -> bool
+  open Core_inclusion
+
+  let check_only f env subst l r =
+    let loc = Location.none and id = Ident.create_local "*dummy*" in
+    let direction = Directionality.unknown ~mark:false in
+    f ~loc env ~direction subst id l r
+
+  let check_ok f env subst l r = Result.is_ok (check_only f env subst l r)
+
+  let module_types env subst mt1 mt2 =
+    check_ok (modtype_infos ~core:core_inclusion) env subst mt1 mt2
+
+  let modules env subst m1 m2 =
+    Result.is_ok @@
+    check_only (module_declarations ~core:core_inclusion) env subst m1 m2
+      Shape.leaf_for_unpack
+
+  let values env subst v1 v2 = check_ok value_descriptions env subst v1 v2
+  let types env subst t1 t2 = check_ok type_declarations env subst t1 t2
+  let classes env subst c1 c2 = check_ok class_declarations env subst c1 c2
+  let class_types env subst ct1 ct2 =
+    check_ok class_type_declarations env subst ct1 ct2
+  let extensions env subst e1 e2 =
+    check_ok extension_constructors env subst e1 e2
+
+end
