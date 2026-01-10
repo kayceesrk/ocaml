@@ -1211,6 +1211,7 @@ runtime_COMMON_C_SOURCES = \
   blake2 \
   callback \
   codefrag \
+  cont_ll \
   compare \
   custom \
   debugger \

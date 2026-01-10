@@ -40,6 +40,7 @@
 #include "caml/shared_heap.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+#include "caml/cont_ll.h"
 
 /* Default speed setting for the major GC. */
 _Atomic uintnat caml_percent_free = Percent_free_def;
@@ -1970,6 +1971,8 @@ static void major_collection_slice(intnat howmuch,
 
   if (!domain_state->sweeping_done) {
     if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
+      /* Debug: print continuation lists before sweeping */
+      caml_cont_ll_print("Before-sweep");
 
     while (!domain_state->sweeping_done &&
            (budget = get_major_slice_work(mode)) > 0) {
@@ -2016,6 +2019,11 @@ mark_again:
     }
 
     if (log_events) CAML_EV_END(EV_MAJOR_MARK);
+    /* If marking completed during this slice, perform finish actions now
+       so continuation processing and After-sweep printing happen promptly. */
+    if (domain_state->marking_done) {
+      caml_finish_marking();
+    }
   }
 
   if (mode != Slice_opportunistic && caml_marking_started()) {
@@ -2279,7 +2287,7 @@ int caml_mark_stack_is_empty(void)
 }
 #endif
 
-static void empty_mark_stack (void)
+void caml_empty_mark_stack (void)
 {
   while (!Caml_state->marking_done){
     /* while, not if: it is possible for caml_empty_minor_heaps_once
@@ -2298,13 +2306,18 @@ static void empty_mark_stack (void)
     caml_gc_log("Finished marking major heap. Marked %" CAML_PRIuNAT " blocks",
                 Caml_state->stat_blocks_marked);
   Caml_state->stat_blocks_marked = 0;
+
 }
 
 void caml_finish_marking (void)
 {
   if (!Caml_state->marking_done) {
     CAML_EV_BEGIN(EV_MAJOR_FINISH_MARKING);
-    empty_mark_stack();
+    caml_empty_mark_stack();
+
+    /* Finish housekeeping for the mark stack and counters. We don't call
+       continuation processing here to ensure we run it exactly once below
+       (even when marking was already done on entry). */
     shrink_mark_stack();
     Caml_state->stat_major_words += Caml_state->allocated_words;
     Caml_state->current_ramp_up_allocated_words_diff +=
@@ -2316,6 +2329,17 @@ void caml_finish_marking (void)
     CAMLassert(Caml_state->marking_done);
     CAML_EV_END(EV_MAJOR_FINISH_MARKING);
   }
+
+  /* Always print the continuation lists and process the todo list after
+     marking is finished. Previously these calls were guarded by the check
+     above and therefore never ran when marking was already complete. */
+  caml_cont_ll_print("After-sweep");
+
+  /* Process continuation todo list after marking phase:
+     - Remove collected continuations
+     - Move unmarked continuations to toclean list and mark them
+     - Scan toclean list to mark all reachable objects */
+  caml_cont_mark_and_shift_toclean();
 }
 
 void caml_finish_sweeping (void)

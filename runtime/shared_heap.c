@@ -36,6 +36,8 @@
 #include "caml/sizeclasses.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+#include "caml/io.h"
+#include <unistd.h>
 
 CAMLexport atomic_uintnat caml_compactions_count;
 
@@ -570,6 +572,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
       block */
       if (Has_status_hd(hd, caml_global_heap_state.GARBAGE)) {
         CAMLassert(Whsize_hd(hd) <= wh);
+
         if (Tag_hd (hd) == Custom_tag) {
           void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
           if (final_fun != NULL) final_fun(Val_hp(p));

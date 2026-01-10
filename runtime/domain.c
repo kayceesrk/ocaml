@@ -991,6 +991,15 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->parser_trace = 0;
 
+  /* Initialize continuation tracking lists for this domain */
+  domain_state->cont_todo_head = Val_long(0);
+  domain_state->cont_toclean_head = Val_long(0);
+  domain_state->cont_minor_todo_head = Val_long(0);
+  caml_register_generational_global_root(&domain_state->cont_toclean_head);
+
+  if (caml_params->backtrace_enabled) {
+    caml_record_backtraces(1);
+  }
   bool bt_enabled = parent
     ? parent->backtrace_active
     : caml_params->backtrace_enabled;
@@ -1008,6 +1017,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
 alloc_main_stack_failure:
 create_stack_cache_failure:
+  caml_remove_generational_global_root(&domain_state->cont_toclean_head);
   caml_remove_generational_global_root(&domain_state->dls_root);
   free_minor_heap_arena();
 allocate_minor_heap_arena_failure:
@@ -2369,6 +2379,7 @@ void caml_domain_terminate(bool last)
 
   caml_remove_generational_global_root(&domain_state->dls_root);
   caml_remove_generational_global_root(&domain_state->backtrace_last_exn);
+  caml_remove_generational_global_root(&domain_state->cont_toclean_head);
   caml_stat_free(domain_state->final_info);
   caml_stat_free(domain_state->ephe_info);
   caml_free_intern_state();

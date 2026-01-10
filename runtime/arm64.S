@@ -1066,7 +1066,23 @@ FUNCTION(caml_perform)
         x1: freshly allocated continuation */
         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
         add     x3, x2, 1 /* x3 := Val_ptr(old stack) */
-        str     x3, [x1] /* Initialize continuation */
+        str     x3, [x1] /* Initialize continuation Field(0) */
+        str     x3, [x1, 8] /* Initialize continuation Field(1) (last_fiber) */
+    /* Insert the fully-initialized continuation into the minor todo list.
+       Only do this for initial perform, not reperform (which jumps to do_perform).
+       Save registers that will be clobbered by C call. */
+        stp     x0, x2, [sp, -16]!
+        CFI_ADJUST(16)
+        stp     x3, x30, [sp, -16]!
+        CFI_ADJUST(16)
+        mov     x0, x1  /* arg 1: continuation */
+        SWITCH_OCAML_TO_C
+        bl      G(caml_cont_ll_insert_minor_todo)
+        SWITCH_C_TO_OCAML
+        ldp     x3, x30, [sp], 16
+        CFI_ADJUST(-16)
+        ldp     x0, x2, [sp], 16
+        CFI_ADJUST(-16)
 L(do_perform):
     /*  x0: effect to perform
         x1: continuation
@@ -1080,7 +1096,6 @@ L(do_perform):
         TSAN_C_CALL G(caml_tsan_exit_on_perform)
         TSAN_RESTORE_CALLER_REGS
 #endif
-        str     x3, [x1, 8] /* Set the last_fiber field in the continuation */
         ldr     x9, Stack_handler(x2)  /* x9 := old stack -> handler */
         ldr     x10, Handler_parent(x9) /* x10 := parent stack */
         cbz     x10, 1f

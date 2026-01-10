@@ -17,6 +17,7 @@ external perform : 'a t -> 'a = "%perform"
 
 type exn += Unhandled: 'a t -> exn
 exception Continuation_already_resumed
+exception Gc_unreachable
 
 let () =
   let printer = function
@@ -61,6 +62,17 @@ module Deep = struct
 
   let discontinue k e =
     resume (take_cont_noexc k) (fun e -> raise e) e (cont_last_fiber k)
+
+  let runtime_discontinue k exn =
+    try discontinue k exn with e when e == exn -> ()
+
+  (* Register discontinue for C runtime to call. The wrapper swallows the
+     propagated exception value so the runtime call always returns normally. *)
+  let () = Callback.register "Effect.discontinue" runtime_discontinue
+
+  (* Register a dedicated exception value for unreachable continuations so the
+     runtime does not have to rely on Invalid_argument. *)
+  let () = Callback.register_exception "Effect.Gc_unreachable" Gc_unreachable
 
   let discontinue_with_backtrace k e bt =
     resume (take_cont_noexc k) (fun e -> Printexc.raise_with_backtrace e bt)

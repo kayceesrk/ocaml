@@ -63,6 +63,7 @@ META
 /ocamlopt.opt
 /ocamlnat
 /_opam
+_*/
 
 # specific files and patterns in sub-directories
 
