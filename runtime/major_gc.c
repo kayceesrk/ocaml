@@ -1993,11 +1993,6 @@ mark_again:
     }
 
     if (log_events) CAML_EV_END(EV_MAJOR_MARK);
-    /* If marking completed during this slice, perform finish actions now
-       so continuation processing and After-sweep printing happen promptly. */
-    if (domain_state->marking_done) {
-      caml_finish_marking();
-    }
   }
 
   if (mode != Slice_opportunistic && caml_marking_started()) {

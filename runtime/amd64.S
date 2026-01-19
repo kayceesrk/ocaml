@@ -1093,10 +1093,7 @@ CFI_STARTPROC
         leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
         movq    %rdi, 0(%rbx) /* Initialise continuation Field(0) */
         movq    %rdi, 8(%rbx) /* Initialise continuation Field(1) (last_fiber) */
-        /* Insert the fully-initialized continuation into the minor todo list.
-           We must do this AFTER initializing Field(0) and Field(1) above.
-           Only do this for initial perform, not reperform (which jumps to do_perform).
-           Save registers that will be clobbered by C call. */
+        /* Save registers that will be clobbered by C call. */
         pushq   %rax; CFI_ADJUST(8)
         pushq   %rdi; CFI_ADJUST(8)
         pushq   %rsi; CFI_ADJUST(8)

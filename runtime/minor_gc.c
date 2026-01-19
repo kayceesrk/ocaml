@@ -676,13 +676,13 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
      Now that Field(2) is not auto-promoted, we can distinguish:
      1. Forwarded (header==0): reachable, add to major todo
      2. Not forwarded: unreachable, promote and add to toclean */
+     caml_cont_ll_print_minor("before-process");
   CAML_EV_BEGIN(EV_MINOR_CONT_PROCESS);
-  caml_cont_ll_print_minor("before-process");
   caml_cont_ll_process_minor_todo(&oldify_one, &st, domain);
-  caml_cont_ll_print_minor("after-process");
   /* Need to mopup any objects promoted by continuation processing */
   oldify_mopup(&st, 0);
   CAML_EV_END(EV_MINOR_CONT_PROCESS);
+  caml_cont_ll_print_minor("after-process");
   
   /* Discontinue unreachable continuations immediately after minor GC */
   if (Is_block(domain->cont_toclean_head)) {

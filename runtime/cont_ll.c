@@ -29,8 +29,8 @@
 
 /* Guard flags to prevent re-entrant processing during GC or discontinuation.
    These are thread-local (per domain). */
-static _Thread_local int processing_mark_and_shift = 0;
-static _Thread_local int processing_discontinue = 0;
+static CAMLthread_local int processing_mark_and_shift = 0;
+static CAMLthread_local int processing_discontinue = 0;
 
 /* Initialization: This is called from domain_create for proper per-domain setup.
    The domain state fields and GC root registration are now handled in domain.c.
@@ -49,15 +49,15 @@ Caml_inline value cont_next(value cont) {
 }
 
 /* Insert [cont] at the head of the todo list.
-   Skip over any already-collected continuations at the head (field 0 == NULL)
-   and insert before the first non-collected node. */
+   Skip over any already-taken continuations at the head (field 0 == NULL)
+   and insert before the first non-taken node. */
 CAMLexport void caml_cont_ll_insert_todo(value cont)
 { 
-  /* Skip over used continuations at the head to find first non-collected node.
+  /* Skip over used continuations at the head to find first non-taken node.
      Note: Field(cont, 0) is set to Val_ptr(NULL) when continuation is used. */
   while (Is_block(Caml_state->cont_todo_head) && 
-         Field(Caml_state->cont_todo_head, 0) == Val_ptr(NULL)) {
-    Caml_state->cont_todo_head = Field(Caml_state->cont_todo_head, 2);
+         atomic_load_relaxed(&Field(Caml_state->cont_todo_head, 0)) == Val_ptr(NULL)) {
+    Caml_state->cont_todo_head = atomic_load_relaxed(&Field(Caml_state->cont_todo_head, 2));
   }
 
   /* defensive: only operate on blocks */
@@ -93,12 +93,6 @@ CAMLexport void caml_cont_ll_print(const char *tag)
   int i=1;
   value cur = Caml_state->cont_todo_head;
   while (Is_block(cur)) {
-    if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                  (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-      Caml_state->cont_todo_head = Val_long(0);
-      break;
-    }
     caml_gc_log("  todo: %d. cont=%p", i, (void*)cur);
     i++;
     cur = cont_next(cur);
@@ -108,12 +102,6 @@ CAMLexport void caml_cont_ll_print(const char *tag)
   i=1;
   cur = Caml_state->cont_toclean_head;
   while (Is_block(cur)) {
-    if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in toclean (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                  (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-      Caml_state->cont_toclean_head = Val_long(0);
-      break;
-    }
     caml_gc_log("  toclean: %d. cont=%p", i, (void*)cur);
     i++;
     cur = cont_next(cur);
@@ -121,7 +109,7 @@ CAMLexport void caml_cont_ll_print(const char *tag)
 }
 
 /* Process todo list after marking phase:
-   - Remove already-collected continuations (field 0 is null)
+   - Remove already-taken continuations (field 0 is null)
    - Move unmarked continuations to toclean list and mark them
    - Then perform a marking scan on all toclean list continuations
    
@@ -138,12 +126,12 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
   processing_mark_and_shift = 1;
   caml_gc_log("cont_ll: Starting mark_and_shift_toclean");
   
-  /* Skip over used continuations at the head to find first non-collected node.
+  /* Skip over used continuations at the head to find first non-taken node.
      Note: Field(cont, 0) is set to Val_ptr(NULL) (i.e., 0) when continuation is used. */
   while (Is_block(Caml_state->cont_todo_head) && 
-         Field(Caml_state->cont_todo_head, 0) == Val_ptr(NULL)) {
+         atomic_load_relaxed(&Field(Caml_state->cont_todo_head, 0)) == Val_ptr(NULL)) {
     caml_gc_log("  Removing Used cont: %p", (void*)Caml_state->cont_todo_head);
-    Caml_state->cont_todo_head = Field(Caml_state->cont_todo_head, 2);
+    Caml_state->cont_todo_head = atomic_load_relaxed(&Field(Caml_state->cont_todo_head, 2));
   }
   value cur = Caml_state->cont_todo_head;
   value prev = Val_long(0);  /* previous node (or 0 if at head) */
@@ -160,7 +148,7 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
        
        Note: Valid stack pointers are stored as Val_ptr(stack) = stack + 1,
        which will be > 1 for any non-NULL stack pointer. */
-    value field0 = Field(cur, 0);
+    value field0 = atomic_load_relaxed(&Field(cur, 0));
     
     if (field0 == Val_ptr(NULL)) {
       /* Used or uninitialized (both have field0 == 1) */
@@ -174,11 +162,8 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
     } else {
       /* Has a valid stack pointer (field0 = Val_ptr(stack) where stack != NULL) */
       if (!is_valid_cont(cur)) {
-        caml_gc_log("  INVALID node in todo (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                    (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-        Caml_state->cont_todo_head = Val_long(0);
-        processing_mark_and_shift = 0;
-        return;
+        caml_fatal_error("cont_ll: INVALID node in todo list: %p (tag=%d, wosize=%lu)",
+                         (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
       }
 
       header_t hd = Hd_val(cur);
@@ -217,11 +202,8 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
   int darkened_any = 0;
   while (Is_block(cur)) {
     if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in toclean (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                  (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-      Caml_state->cont_toclean_head = Val_long(0);
-      processing_mark_and_shift = 0;
-      return;
+      caml_fatal_error("cont_ll: INVALID node in toclean list: %p (tag=%d, wosize=%lu)",
+                       (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
     }
     caml_darken_cont(cur);
     darkened_any = 1;
@@ -294,11 +276,8 @@ CAMLexport void caml_discontinue_toclean(void)
   while (Is_block(Caml_state->cont_toclean_head)) {
     cur = Caml_state->cont_toclean_head;
     if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in toclean (Dropping the entire list): %p (tag=%d, wosize=%lu)",
-                  (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
-      Caml_state->cont_toclean_head = Val_long(0);
-      processing_discontinue = 0;
-      CAMLreturn0;
+      caml_fatal_error("cont_ll: INVALID node in toclean during discontinue: %p (tag=%d, wosize=%lu)",
+                       (void*)cur, (int)Tag_val(cur), (unsigned long)Wosize_val(cur));
     }
     
     /* Remove from list BEFORE discontinuing to avoid dangling references */
@@ -357,8 +336,8 @@ CAMLexport void caml_cont_ll_insert_minor_todo(value cont)
   /* Skip over used continuations at the head */
   while (Is_block(Caml_state->cont_minor_todo_head) && 
          is_young(Caml_state->cont_minor_todo_head) && 
-         Field(Caml_state->cont_minor_todo_head, 0) == Val_ptr(NULL)) {
-    Caml_state->cont_minor_todo_head = Field(Caml_state->cont_minor_todo_head, 2);
+         atomic_load_relaxed(&Field(Caml_state->cont_minor_todo_head, 0)) == Val_ptr(NULL)) {
+    Caml_state->cont_minor_todo_head = atomic_load_relaxed(&Field(Caml_state->cont_minor_todo_head, 2));
   }
   
   Field(cont, 2) = Caml_state->cont_minor_todo_head;
@@ -488,7 +467,7 @@ CAMLexport void caml_cont_ll_process_minor_todo(
        - Val_ptr(NULL) == 1: continuation was used (stack consumed)
        - 0: continuation was never initialized (allocation but no perform yet)
        Both cases mean we should skip this continuation. */
-    value stack_value = Field(cur, 0);
+    value stack_value = atomic_load_relaxed(&Field(cur, 0));
     if (stack_value == Val_ptr(NULL) || stack_value == 0) {
       caml_gc_log("  cont_ll_minor: Used/uninitialized cont %p (field0=%p), skipping", 
                   (void*)cur, (void*)stack_value);
