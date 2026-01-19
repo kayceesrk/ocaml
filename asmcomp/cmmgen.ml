@@ -889,19 +889,13 @@ and transl_prim_1 env p arg dbg =
       tag_int (bswap16 (ignore_high_bit_int (untag_int
         (transl env arg) dbg)) dbg) dbg
   | Pperform ->
-      let cont_expr =
-        (* Allocate continuation with two extra fields for prev and next pointers *)
+      let cont =
+        (* Allocate continuation with one extra fields for next pointer *)
         make_alloc dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0; int_const dbg 0]
       in
-      let cont_id = V.create_local "cont" in
-      Clet(VP.create cont_id,
-           cont_expr,
-           (* Note: caml_perform will call caml_cont_ll_insert_minor_todo internally
-              after initializing the continuation fields. We removed the insert here
-              because at this point the continuation is not yet initialized. *)
-           Cop(Capply typ_val,
-               [Cconst_symbol ("caml_perform", dbg); transl env arg; Cvar cont_id],
-               dbg))
+      Cop(Capply typ_val,
+       [Cconst_symbol ("caml_perform", dbg); transl env arg; cont],
+       dbg)
   | Pdls_get ->
       Cop(Cdls_get, [transl env arg], dbg)
   | Ppoll ->

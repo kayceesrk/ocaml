@@ -59,15 +59,14 @@ Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
   if (parent_stack == NULL) {
     return Val_unit;
   } else {
-    /* Allocate continuation directly in major heap with 3 fields.
-       Using major heap ensures continuations are tracked by major GC for leak detection. */
-    value cont = caml_alloc_shr(3, Cont_tag);
-    caml_initialize(&Field(cont, 0), Val_ptr(parent_stack));
-    caml_initialize(&Field(cont, 1), Val_ptr(parent_stack));  /* last_fiber field - must be a stack pointer */
-    caml_initialize(&Field(cont, 2), Val_long(0)); /* next pointer for linked list */
+    /* Allocate continuation in minor heap with 3 fields.
+       caml_cont_ll_insert_minor_todo handles promotion tracking during GC. */
+    value cont = caml_alloc_3(Cont_tag, Val_ptr(parent_stack), 
+                              Val_ptr(parent_stack), Val_long(0));
     
-    /* Register cont in the todo list so it can be processed */
-    caml_cont_ll_insert_todo(cont);
+    /* Register cont in the minor heap todo list.
+       During minor GC, this will be promoted if needed and moved to major todo list. */
+    caml_cont_ll_insert_minor_todo(cont);
     Stack_parent(domain_state->current_stack) = NULL;
     return cont;
   }
@@ -102,8 +101,6 @@ void caml_init_callbacks(void)
 #ifdef THREADED_CODE
   caml_thread_code(callback_code, sizeof(callback_code));
 #endif
-  /* Initialize continuation dll module */
-  caml_cont_ll_init();
 }
 
 CAMLexport value caml_callbackN_exn(value closure, int narg, value args[])
@@ -179,8 +176,7 @@ CAMLexport value caml_callback3_exn(value closure,
 
 void caml_init_callbacks(void)
 {
-  /* Initialize continuation dll module */
-  caml_cont_ll_init();
+  /* Nothing to do */
 }
 
 typedef value (callback_stub)(caml_domain_state* state,

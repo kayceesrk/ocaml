@@ -35,18 +35,13 @@ static _Thread_local int processing_discontinue = 0;
 /* Initialization: This is called from domain_create for proper per-domain setup.
    The domain state fields and GC root registration are now handled in domain.c.
    This function is kept for backward compatibility and additional init if needed. */
-CAMLexport void caml_cont_ll_init(void)
-{
-  /* Domain-local list heads and GC root registration are handled in domain_create.
-     This function can be used for any additional initialization if needed. */
-}
 
 /* Internal helper for accessing next field in a continuation block.
    We assume the continuation has at least 3 fields and that field 2
    is reserved for next pointer. */
 
 static int is_valid_cont(value v) {
-  return Is_block(v) && Tag_val(v) == Cont_tag && Wosize_val(v) >= 3;
+  return Is_block(v) && Tag_val(v) == Cont_tag;
 }
 
 Caml_inline value cont_next(value cont) {
@@ -339,12 +334,6 @@ CAMLexport void caml_discontinue_toclean(void)
 /* Minor GC continuation tracking                                             */
 /* ========================================================================== */
 
-/* Initialize the minor continuation list (called per-domain).
-   Note: Initialization is now handled in domain_create, this is for backward compat. */
-CAMLexport void caml_cont_ll_minor_init(void)
-{
-  Caml_state->cont_minor_todo_head = Val_long(0);
-}
 
 /* Check if a value is in the minor heap */
 static int is_young(value v) {
@@ -382,11 +371,6 @@ CAMLexport value caml_cont_ll_get_minor_todo_head(void)
   return Caml_state->cont_minor_todo_head;
 }
 
-/* Clear the minor todo list */
-CAMLexport void caml_cont_ll_clear_minor_todo(void)
-{
-  Caml_state->cont_minor_todo_head = Val_long(0);
-}
 
 /* Print the minor todo list for debugging */
 CAMLexport void caml_cont_ll_print_minor(const char *tag)
@@ -397,13 +381,24 @@ CAMLexport void caml_cont_ll_print_minor(const char *tag)
   int i = 1;
   value cur = Caml_state->cont_minor_todo_head;
   while (Is_block(cur)) {
-    if (!is_valid_cont(cur)) {
-      caml_gc_log("  INVALID node in minor_todo: %p", (void*)cur);
-      break;
+    /* Check if forwarded (header == 0) */
+    int is_forwarded = 0;
+    if (is_young(cur)) {
+      header_t hd = Hd_val(cur);
+      is_forwarded = (hd == 0);
     }
-    caml_gc_log("  minor_todo: %d. cont=%p (young=%d)", i, (void*)cur, is_young(cur));
+    
+    caml_gc_log("  minor_todo: %d. cont=%p (young=%d, forwarded=%d)", 
+                i, (void*)cur, is_young(cur), is_forwarded);
     i++;
-    cur = cont_next(cur);
+    
+    /* For young blocks, read Field(2) directly even if forwarded.
+       For major heap blocks or non-continuations, use cont_next. */
+    if (is_young(cur)) {
+      cur = Field(cur, 2);
+    } else {
+      cur = cont_next(cur);
+    }
   }
 }
 

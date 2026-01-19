@@ -293,12 +293,6 @@ static void oldify_one (void* st_v, value v, volatile value *p)
         caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
                         stk, 0);
       }
-      /* If next points to a young block that's also a continuation,
-         we need to promote it too to maintain list integrity.
-         This ensures the entire linked list gets promoted together. */
-      if (Is_block(next_value) && Is_young(next_value)) {
-        oldify_one(st, next_value, &Field(result, 2));
-      }
     }
     else
     {
@@ -681,11 +675,13 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
 
   /* Process minor continuation todo list after all normal promotions.
-     This handles:
-     1. Continuations that were promoted - move to major todo list
-     2. Unreachable continuations - promote and add to toclean list */
+  This handles:
+  1. Continuations that were promoted - move to major todo list
+  2. Unreachable continuations - promote and add to toclean list */
   CAML_EV_BEGIN(EV_MINOR_CONT_PROCESS);
+  caml_cont_ll_print_minor("before-process");
   caml_cont_ll_process_minor_todo(&oldify_one, &st, domain);
+  caml_cont_ll_print_minor("after-process");
   /* Need to mopup any objects promoted by continuation processing */
   oldify_mopup(&st, 0);
   CAML_EV_END(EV_MINOR_CONT_PROCESS);

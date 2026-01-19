@@ -8,11 +8,8 @@
 /* Major GC continuation tracking                                             */
 /* ========================================================================== */
 
-CAMLextern void caml_cont_ll_init(void);
 CAMLextern void caml_cont_ll_insert_todo(value cont);
 CAMLextern void caml_cont_ll_insert_toclean(value cont);
-CAMLextern void caml_cont_ll_scan_todo_c(void (*cb)(value, void*), void *data);
-CAMLextern void caml_cont_ll_scan_todo_ocaml(value f);
 CAMLextern value caml_cont_ll_get_todo_head(void);
 CAMLextern value caml_cont_ll_get_toclean_head(void);
 CAMLextern void caml_cont_ll_print(const char *tag);
@@ -30,18 +27,12 @@ CAMLextern void caml_discontinue_toclean(void);
    - If continuation is unreachable and not promoted, promote it and add to toclean
 */
 
-/* Initialize the minor continuation list for a domain. Called during domain setup. */
-CAMLextern void caml_cont_ll_minor_init(void);
-
 /* Insert a minor heap continuation into the minor todo list.
    This should be called when a continuation is allocated in the minor heap. */
 CAMLextern void caml_cont_ll_insert_minor_todo(value cont);
 
 /* Get the head of the minor todo list (for debugging/testing). */
 CAMLextern value caml_cont_ll_get_minor_todo_head(void);
-
-/* Clear the minor todo list. Called after minor GC processing. */
-CAMLextern void caml_cont_ll_clear_minor_todo(void);
 
 /* Process the minor todo list during minor GC.
    This function should be called after promotion phase of minor GC.
