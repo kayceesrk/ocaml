@@ -275,7 +275,6 @@ static void oldify_one (void* st_v, value v, volatile value *p)
 
   if (tag == Cont_tag) {
     value stack_value = Field(v, 0);
-    value next_value = Field(v, 2);  /* Save the next pointer */
     CAMLassert(Wosize_hd(hd) == 3);
     CAMLassert(infix_offset == 0);
     result = alloc_shared(st->domain, 3, Cont_tag, Reserved_hd(hd));
@@ -283,12 +282,11 @@ static void oldify_one (void* st_v, value v, volatile value *p)
       struct stack_info* stk = Ptr_val(stack_value);
       Field(result, 0) = stack_value;
       Field(result, 1) = Field(v, 1);
-      /* Preserve the next pointer for linked list traversal during minor GC.
-         If the next pointer points to a minor heap continuation, it will be
-         handled during caml_cont_ll_process_minor_todo. For now, just copy
-         the value as-is. If it points to minor heap, it will either get
-         promoted and updated, or the list processing will handle it. */
-      Field(result, 2) = next_value;
+      /* DO NOT promote Field(2) (next pointer) automatically!
+         This prevents recursive promotion of the entire linked list.
+         Clear it so the promoted continuation is not linked.
+         caml_cont_ll_process_minor_todo will rebuild the list structure. */
+      Field(result, 2) = Val_long(0);
       if (stk != NULL) {
         caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
                         stk, 0);
@@ -675,9 +673,9 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
 
   /* Process minor continuation todo list after all normal promotions.
-  This handles:
-  1. Continuations that were promoted - move to major todo list
-  2. Unreachable continuations - promote and add to toclean list */
+     Now that Field(2) is not auto-promoted, we can distinguish:
+     1. Forwarded (header==0): reachable, add to major todo
+     2. Not forwarded: unreachable, promote and add to toclean */
   CAML_EV_BEGIN(EV_MINOR_CONT_PROCESS);
   caml_cont_ll_print_minor("before-process");
   caml_cont_ll_process_minor_todo(&oldify_one, &st, domain);
@@ -685,6 +683,12 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   /* Need to mopup any objects promoted by continuation processing */
   oldify_mopup(&st, 0);
   CAML_EV_END(EV_MINOR_CONT_PROCESS);
+  
+  /* Discontinue unreachable continuations immediately after minor GC */
+  if (Is_block(domain->cont_toclean_head)) {
+    caml_gc_log("Calling discontinue_toclean after minor GC");
+    caml_discontinue_toclean();
+  }
 
   domain->young_ptr = domain->young_end;
   /* Trigger a GC poll when half of the minor heap is filled. At that point, a
