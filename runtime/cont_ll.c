@@ -114,13 +114,16 @@ CAMLexport void caml_cont_ll_print(const char *tag)
    - Then perform a marking scan on all toclean list continuations
    
    This should be called after the major GC marking phase completes.
+   
+   Returns: 1 if any continuations were darkened (caller should mark again),
+            0 otherwise.
 */
-CAMLexport void caml_cont_mark_and_shift_toclean(void)
+CAMLexport int caml_cont_mark_and_shift_toclean(void)
 {
   /* Prevent re-entrant calls during GC or while discontinuing */
   if (processing_mark_and_shift || processing_discontinue) {
     caml_gc_log("cont_ll: Skipping mark_and_shift_toclean (already processing)");
-    return;
+    return 0;
   }
   
   processing_mark_and_shift = 1;
@@ -210,18 +213,15 @@ CAMLexport void caml_cont_mark_and_shift_toclean(void)
     cur = cont_next(cur);
   }
 
-  /* Finish marking any objects that were reachable from toclean continuations.
-     Only drain the mark stack if we actually scheduled work above; calling
-     caml_empty_mark_stack() unconditionally could re-enter this code path
-     and cause an infinite loop when nothing new was scheduled. */
-  if (darkened_any) {
-    caml_empty_mark_stack();
-  } else {
-    caml_gc_log("  No toclean entries darkened; skipping empty mark stack drain");
+  /* Return whether any continuations were darkened. If so, the caller
+     should trigger another marking pass to drain the mark stack. */
+  if (!darkened_any) {
+    caml_gc_log("  No toclean entries darkened");
   }
   
-  caml_gc_log("cont_ll: Finished mark_and_shift_toclean");
+  caml_gc_log("cont_ll: Finished mark_and_shift_toclean (darkened_any=%d)", darkened_any);
   processing_mark_and_shift = 0;
+  return darkened_any;
 }
 
 /* Process toclean list by calling OCaml discontinue function:

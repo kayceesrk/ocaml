@@ -1950,9 +1950,6 @@ static void major_collection_slice(intnat howmuch,
 
   if (!domain_state->sweeping_done) {
     if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
-      /* Debug: print continuation lists before sweeping */
-      caml_cont_ll_print("Before-sweep");
-
     while (!domain_state->sweeping_done &&
            (budget = get_major_slice_work(mode)) > 0) {
       intnat left = caml_sweep(domain_state->shared_heap, budget);
@@ -2109,6 +2106,17 @@ mark_again:
           (void)caml_atomic_counter_decr(&num_domains_to_ephe_sweep);
         }
       }
+
+      /* Process unreachable continuations: move unmarked ones from todo list
+         to toclean. If any continuations were darkened, go back to mark_again
+         to drain the mark stack. */
+      caml_cont_ll_print("before-process");
+      if (caml_cont_mark_and_shift_toclean()) {
+        if (!domain_state->marking_done &&
+            get_major_slice_work(mode) > 0)
+          goto mark_again;
+      }
+      caml_cont_ll_print("after-process");
     }
 
     /* Complete GC phase */
@@ -2256,7 +2264,7 @@ int caml_mark_stack_is_empty(void)
 }
 #endif
 
-void caml_empty_mark_stack (void)
+static void empty_mark_stack (void)
 {
   while (!Caml_state->marking_done){
     /* while, not if: it is possible for caml_empty_minor_heaps_once
@@ -2282,7 +2290,7 @@ void caml_finish_marking (void)
 {
   if (!Caml_state->marking_done) {
     CAML_EV_BEGIN(EV_MAJOR_FINISH_MARKING);
-    caml_empty_mark_stack();
+    empty_mark_stack();
 
     /* Finish housekeeping for the mark stack and counters. We don't call
        continuation processing here to ensure we run it exactly once below
@@ -2299,16 +2307,6 @@ void caml_finish_marking (void)
     CAML_EV_END(EV_MAJOR_FINISH_MARKING);
   }
 
-  /* Always print the continuation lists and process the todo list after
-     marking is finished. Previously these calls were guarded by the check
-     above and therefore never ran when marking was already complete. */
-  caml_cont_ll_print("After-sweep");
-
-  /* Process continuation todo list after marking phase:
-     - Remove collected continuations
-     - Move unmarked continuations to toclean list and mark them
-     - Scan toclean list to mark all reachable objects */
-  caml_cont_mark_and_shift_toclean();
 }
 
 void caml_finish_sweeping (void)

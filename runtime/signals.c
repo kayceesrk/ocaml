@@ -372,7 +372,7 @@ caml_result caml_do_pending_actions_res(void)
      in case a context switch happens: all actions have been processed
      at this point. */
   caml_process_external_interrupt();
-  
+
   return Result_unit;
 
 exception:

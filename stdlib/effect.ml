@@ -64,7 +64,7 @@ module Deep = struct
     resume (take_cont_noexc k) (fun e -> raise e) e (cont_last_fiber k)
 
   let runtime_discontinue k exn =
-    try discontinue k exn with e when e == exn -> ()
+    try discontinue k exn with _ -> ()
 
   (* Register discontinue for C runtime to call. The wrapper swallows the
      propagated exception value so the runtime call always returns normally. *)

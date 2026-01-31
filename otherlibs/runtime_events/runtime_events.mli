@@ -431,13 +431,6 @@ during a minor GC.
 Event spanning the promotion of local roots during a minor GC.
 @since 5.0
 *)
-| EV_MINOR_CONT_PROCESS
-(**
-Event spanning the processing of minor heap continuations during a minor GC.
-This includes moving promoted continuations to the major todo list and
-promoting unreachable continuations to the toclean list.
-@since 5.4
-*)
 | EV_DOMAIN_CONDITION_WAIT
 (**
 Event spanning waiting in Condition.wait.
@@ -474,11 +467,6 @@ Event spanning releasing the evacuated pools at the end of a compaction.
 (**
 Event spanning a domain needing to empty its minor heap for a new allocation.
 This includes time spent trying to become stop-the-world leader.
-@since 5.4
-*)
-| EV_MINOR_EPHE_CLEAN
-(**
-Event spanning cleaning of ephemerons after minor GC.
 @since 5.4
 *)
 

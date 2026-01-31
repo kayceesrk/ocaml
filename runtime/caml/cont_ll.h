@@ -13,7 +13,7 @@ CAMLextern void caml_cont_ll_insert_toclean(value cont);
 CAMLextern value caml_cont_ll_get_todo_head(void);
 CAMLextern value caml_cont_ll_get_toclean_head(void);
 CAMLextern void caml_cont_ll_print(const char *tag);
-CAMLextern void caml_cont_mark_and_shift_toclean(void);
+CAMLextern int caml_cont_mark_and_shift_toclean(void);
 CAMLextern void caml_discontinue_toclean(void);
 
 /* ========================================================================== */
