@@ -895,8 +895,10 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
     caml_empty_minor_heap_promote(domain, participating_count, participating);
 
   if (prom.locked_ephemerons) {
+    CAML_EV_BEGIN(EV_MINOR_EPHE_CLEAN);
     caml_gc_log("cleaning minor ephemerons");
     ephe_clean_minor(domain);
+    CAML_EV_END(EV_MINOR_EPHE_CLEAN);
   }
 
   CAML_EV_BEGIN(EV_MINOR_MEMPROF_CLEAN);

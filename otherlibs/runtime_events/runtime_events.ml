@@ -96,7 +96,6 @@ type runtime_phase =
 | EV_COMPACT_RELEASE
 | EV_EMPTY_MINOR
 
-
 type lifecycle =
   EV_RING_START
 | EV_RING_STOP

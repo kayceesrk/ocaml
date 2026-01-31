@@ -1950,6 +1950,7 @@ static void major_collection_slice(intnat howmuch,
 
   if (!domain_state->sweeping_done) {
     if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
+
     while (!domain_state->sweeping_done &&
            (budget = get_major_slice_work(mode)) > 0) {
       intnat left = caml_sweep(domain_state->shared_heap, budget);
@@ -2283,7 +2284,6 @@ static void empty_mark_stack (void)
     caml_gc_log("Finished marking major heap. Marked %" CAML_PRIuNAT " blocks",
                 Caml_state->stat_blocks_marked);
   Caml_state->stat_blocks_marked = 0;
-
 }
 
 void caml_finish_marking (void)
@@ -2291,10 +2291,6 @@ void caml_finish_marking (void)
   if (!Caml_state->marking_done) {
     CAML_EV_BEGIN(EV_MAJOR_FINISH_MARKING);
     empty_mark_stack();
-
-    /* Finish housekeeping for the mark stack and counters. We don't call
-       continuation processing here to ensure we run it exactly once below
-       (even when marking was already done on entry). */
     shrink_mark_stack();
     Caml_state->stat_major_words += Caml_state->allocated_words;
     Caml_state->current_ramp_up_allocated_words_diff +=
@@ -2306,7 +2302,6 @@ void caml_finish_marking (void)
     CAMLassert(Caml_state->marking_done);
     CAML_EV_END(EV_MAJOR_FINISH_MARKING);
   }
-
 }
 
 void caml_finish_sweeping (void)
