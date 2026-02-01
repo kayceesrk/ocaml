@@ -1340,8 +1340,7 @@ do_resume: {
         goto raise_exception;
       }
 
-      /* Allocate continuation in minor heap with 3 fields.
-         caml_cont_ll_insert_minor_todo handles promotion tracking during GC. */
+      /* Allocate continuation and register in minor todo list for GC tracking */
       cont = caml_alloc_3(Cont_tag, Val_ptr(old_stack), 
                           Val_ptr(old_stack), Val_long(0));
 
@@ -1356,9 +1355,7 @@ do_resume: {
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
 
-      /* Register cont in the minor heap todo list.
-         During minor GC, this will be promoted if needed and moved to major todo list. */
-      caml_cont_ll_insert_minor_todo(cont);
+      caml_cont_insert_minor_todo(cont);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       extra_args = Long_val(sp[1]);

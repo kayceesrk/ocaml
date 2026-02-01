@@ -282,10 +282,8 @@ static void oldify_one (void* st_v, value v, volatile value *p)
       struct stack_info* stk = Ptr_val(stack_value);
       Field(result, 0) = stack_value;
       Field(result, 1) = Field(v, 1);
-      /* DO NOT promote Field(2) (next pointer) automatically!
-         This prevents recursive promotion of the entire linked list.
-         Clear it so the promoted continuation is not linked.
-         caml_cont_ll_process_minor_todo will rebuild the list structure. */
+      /* Clear Field(2) to prevent recursive promotion of linked list.
+         caml_cont_process_minor_todo rebuilds the list structure. */
       Field(result, 2) = Val_long(0);
       if (stk != NULL) {
         caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
@@ -672,15 +670,14 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS_PROMOTE);
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
 
-  /* Process minor continuation todo list after all normal promotions.
-     Now that Field(2) is not auto-promoted, we can distinguish:
-     1. Forwarded (header==0): reachable, add to major todo
-     2. Not forwarded: unreachable, promote and add to toclean */
-  caml_cont_ll_print_minor("before-process");
-  caml_cont_ll_process_minor_todo(&oldify_one, &st, domain);
+  /* Process minor continuation todo list:
+     - Forwarded (reachable): add to cont_major_todo_head
+     - Not forwarded (unreachable): promote and add to cont_major_toclean_head */
+  caml_cont_print_minor("before-process");
+  caml_cont_process_minor_todo(&oldify_one, &st, domain);
   /* Need to mopup any objects promoted by continuation processing */
   oldify_mopup(&st, 0);
-  caml_cont_ll_print_minor("after-process");
+  caml_cont_print_minor("after-process");
 
   domain->young_ptr = domain->young_end;
   /* Trigger a GC poll when half of the minor heap is filled. At that point, a

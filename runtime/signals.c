@@ -364,8 +364,8 @@ caml_result caml_do_pending_actions_res(void)
   result = caml_final_do_calls_res();
   if (caml_result_is_exception(result)) goto exception;
 
-  /* Process unreachable continuations in toclean list */
-  caml_discontinue_toclean();
+  /* Discontinue unreachable continuations */
+  caml_cont_discontinue_toclean();
   
   /* Process external interrupts (e.g. preemptive systhread switching).
      By doing this last, we do not need to set the action pending flag

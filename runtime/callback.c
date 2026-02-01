@@ -59,14 +59,10 @@ Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
   if (parent_stack == NULL) {
     return Val_unit;
   } else {
-    /* Allocate continuation in minor heap with 3 fields.
-       caml_cont_ll_insert_minor_todo handles promotion tracking during GC. */
+    /* Allocate continuation and register in minor todo list for GC tracking */
     value cont = caml_alloc_3(Cont_tag, Val_ptr(parent_stack), 
                               Val_ptr(parent_stack), Val_long(0));
-    
-    /* Register cont in the minor heap todo list.
-       During minor GC, this will be promoted if needed and moved to major todo list. */
-    caml_cont_ll_insert_minor_todo(cont);
+    caml_cont_insert_minor_todo(cont);
     Stack_parent(domain_state->current_stack) = NULL;
     return cont;
   }

@@ -2108,16 +2108,15 @@ mark_again:
         }
       }
 
-      /* Process unreachable continuations: move unmarked ones from todo list
-         to toclean. If any continuations were darkened, go back to mark_again
-         to drain the mark stack. */
-      caml_cont_ll_print("before-process");
+      /* Process continuations: move unmarked from todo to toclean.
+         If any were darkened, mark again to drain the mark stack. */
+      caml_cont_print_major("before-process");
       if (caml_cont_mark_and_shift_toclean()) {
         if (!domain_state->marking_done &&
             get_major_slice_work(mode) > 0)
           goto mark_again;
       }
-      caml_cont_ll_print("after-process");
+      caml_cont_print_major("after-process");
     }
 
     /* Complete GC phase */
