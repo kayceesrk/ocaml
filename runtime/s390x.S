@@ -939,7 +939,23 @@ CFI_STARTPROC
         %r3: freshly allocated continuation */
         lg      %r4, Caml_state(current_stack) /* %r4 := old stack */
         lay     %r5, 1(%r4) /* %r5 (last_fiber) := Val_ptr(old stack) */
-        stg     %r5, 0(%r3) /* Initialise continuation */
+        stg     %r5, 0(%r3) /* Initialise continuation Field(0) */
+        stg     %r5, 8(%r3) /* Initialise continuation Field(1) (last_fiber) */
+    /* Insert continuation %r3 into minor todo list (inline) */
+        lg      %r1, Caml_state(cont_minor_todo_head)
+LBL(cont_skip_loop):
+    /* Skip used continuations: while Is_block && Field(0)==Val_ptr(NULL) */
+        tmll    %r1, 1
+        jne     LBL(cont_do_insert)              /* Not a block, exit loop */
+        lg      %r0, 0(%r1)                      /* Load Field(0) */
+        cgfi    %r0, 1
+        jne     LBL(cont_do_insert)              /* Field(0) != 1, exit loop */
+        lg      %r1, 16(%r1)                     /* head = Field(head, 2) */
+        j       LBL(cont_skip_loop)
+LBL(cont_do_insert):
+    /* Insert: Field(cont,2) = head; head = cont */
+        stg     %r1, 16(%r3)
+        stg     %r3, Caml_state(cont_minor_todo_head)
 LBL(do_perform):
     /*  %r2: effect to perform
         %r3: continuation

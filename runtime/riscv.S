@@ -999,7 +999,23 @@ FUNCTION(caml_perform)
         a1: freshly allocated continuation */
         ld      a2, Caml_state(current_stack) /* a2 := old stack */
         addi    a3, a2, 1 /* a3 := Val_ptr(old stack) */
-        sd      a3, 0(a1) /* Initialize continuation */
+        sd      a3, 0(a1) /* Initialize continuation Field(0) */
+        sd      a3, 8(a1) /* Initialize continuation Field(1) (last_fiber) */
+    /* Insert continuation a1 into minor todo list (inline) */
+        ld      t0, Caml_state(cont_minor_todo_head)
+L(cont_skip_loop):
+    /* Skip used continuations: while Is_block && Field(0)==Val_ptr(NULL) */
+        andi    t1, t0, 1
+        bnez    t1, L(cont_do_insert)           /* Not a block, exit loop */
+        ld      t1, 0(t0)                        /* Load Field(0) */
+        li      t2, 1
+        bne     t1, t2, L(cont_do_insert)        /* Field(0) != 1, exit loop */
+        ld      t0, 16(t0)                       /* head = Field(head, 2) */
+        j       L(cont_skip_loop)
+L(cont_do_insert):
+    /* Insert: Field(cont,2) = head; head = cont */
+        sd      t0, 16(a1)
+        sd      a1, Caml_state(cont_minor_todo_head)
 L(do_perform):
     /*  a0: effect to perform
         a1: continuation

@@ -1093,17 +1093,20 @@ CFI_STARTPROC
         leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
         movq    %rdi, 0(%rbx) /* Initialise continuation Field(0) */
         movq    %rdi, 8(%rbx) /* Initialise continuation Field(1) (last_fiber) */
-        /* Save registers that will be clobbered by C call. */
-        pushq   %rax; CFI_ADJUST(8)
-        pushq   %rdi; CFI_ADJUST(8)
-        pushq   %rsi; CFI_ADJUST(8)
-        movq    %rbx, C_ARG_1  /* arg 1: continuation */
-        SWITCH_OCAML_TO_C
-        C_call  (GCALL(caml_cont_ll_insert_minor_todo))
-        SWITCH_C_TO_OCAML
-        popq    %rsi; CFI_ADJUST(-8)
-        popq    %rdi; CFI_ADJUST(-8)
-        popq    %rax; CFI_ADJUST(-8)
+        /* Insert continuation %rbx into minor todo list (inline) */
+        movq    Caml_state(cont_minor_todo_head), %r10
+LBL(cont_skip_loop):
+/* Skip used continuations: while Is_block && Field(0)==Val_ptr(NULL) */
+        testq   $1, %r10
+        jnz     LBL(cont_do_insert)             /* Not a block, exit loop */
+        cmpq    $1, 0(%r10)                     /* Check Field(0) == Val_ptr(NULL) */
+        jne     LBL(cont_do_insert)             /* Field(0) != 1, exit loop */
+        movq    16(%r10), %r10                  /* head = Field(head, 2) */
+        jmp     LBL(cont_skip_loop)
+LBL(cont_do_insert):
+/* Insert: Field(cont,2) = head; head = cont */
+        movq    %r10, 16(%rbx)
+        movq    %rbx, Caml_state(cont_minor_todo_head)
 LBL(do_perform):
     /*  %rdi: last_fiber
         %rsi: old stack */
