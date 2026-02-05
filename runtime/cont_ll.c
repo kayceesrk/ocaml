@@ -220,7 +220,8 @@ CAMLexport void caml_cont_print_minor(const char *tag)
    - Not forwarded (unreachable): promote and add to major_todo */
 CAMLexport void caml_cont_process_minor_todo(
   void (*oldify_fn)(void*, value, volatile value*),
-  void* oldify_state)
+  void* oldify_state,
+  caml_domain_state* domain_state)
 {
   caml_gc_log("cont_minor: processing");  
   value cur = Caml_state->cont_minor_todo_head;
@@ -239,6 +240,15 @@ CAMLexport void caml_cont_process_minor_todo(
       caml_gc_log("  forwarded: %p -> %p", (void*)cur, (void*)fwd);
       caml_cont_insert_major_todo(fwd);
     } else {
+      value stack_val = atomic_load_relaxed(&Field(cur, 0));
+      struct stack_info* stk = Ptr_val(stack_val);
+      
+      if (stk == domain_state->current_stack) {
+        caml_gc_log("  skip current stack: %p", (void*)cur);
+        cur = next;
+        continue;
+      }
+
     /* If NOT taken unreachable cont then promote and add to major_todo list */
       caml_gc_log("  unreachable: %p -> promoting", (void*)cur);
       volatile value promoted = Val_long(0);
