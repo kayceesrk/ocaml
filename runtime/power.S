@@ -934,23 +934,7 @@ FUNCTION caml_perform
      r4: freshly allocated continuation */
         ld      5, Caml_state(current_stack) /* r5 := old stack */
         addi    6, 5, 1  /* r6 := Val_ptr(old stack) */
-        std     6, 0(4)  /* Initialize continuation Field(0) */
-        std     6, 8(4)  /* Initialize continuation Field(1) (last_fiber) */
-  /* Insert continuation r4 into minor todo list (inline) */
-        ld      9, Caml_state(cont_minor_todo_head)
-.Lcont_skip_loop:
-  /* Skip used continuations: while Is_block && Field(0)==Val_ptr(NULL) */
-        andi.   0, 9, 1
-        bne     .Lcont_do_insert                 /* Not a block, exit loop */
-        ld      0, 0(9)                          /* Load Field(0) */
-        cmpdi   0, 1
-        bne     .Lcont_do_insert                 /* Field(0) != 1, exit loop */
-        ld      9, 16(9)                         /* head = Field(head, 2) */
-        b       .Lcont_skip_loop
-.Lcont_do_insert:
-  /* Insert: Field(cont,2) = head; head = cont */
-        std     9, 16(4)
-        std     4, Caml_state(cont_minor_todo_head)
+        std     6, 0(4)  /* Initialize continuation */
 .Ldo_perform:
   /* r3: effect to perform
      r4: continuation
