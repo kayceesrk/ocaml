@@ -672,9 +672,9 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
 
   /* Process minor continuation todo list:
      - Forwarded (reachable): add to cont_major_todo_head
-     - Not forwarded (unreachable): promote and add to cont_major_toclean_head */
+     - Not forwarded (unreachable): promote and add to cont_major_todo_head */
   caml_cont_print_minor("before-process");
-  caml_cont_process_minor_todo(&oldify_one, &st, domain);
+  caml_cont_process_minor_todo(&oldify_one, &st);
   /* Need to mopup any objects promoted by continuation processing */
   oldify_mopup(&st, 0);
   caml_cont_print_minor("after-process");

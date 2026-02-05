@@ -68,7 +68,7 @@ module Deep = struct
 
   (* Register discontinue for C runtime to call. The wrapper swallows the
      propagated exception value so the runtime call always returns normally. *)
-  let () = Callback.register "Effect.discontinue" runtime_discontinue
+  let () = Callback.register "Effect.runtime_discontinue" runtime_discontinue
 
   (* Register a dedicated exception value for unreachable continuations so the
      runtime does not have to rely on Invalid_argument. *)

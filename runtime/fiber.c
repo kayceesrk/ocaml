@@ -211,9 +211,9 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->sp = (value*)hand;
   stack->exception_ptr = NULL;
   stack->id = id;
-  /* Always set magic to 42 for stack validity checking.
-     This is used by cont_ll.c to validate stack pointers. */
+#ifdef DEBUG
   stack->magic = 42;
+#endif
   /* Due to stack alignment performed above, the actual stack size may be
    * larger than requested. */
   CAMLassert(Stack_high(stack) - Stack_base(stack) >= wosize);

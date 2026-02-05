@@ -21,8 +21,7 @@ CAMLextern void caml_cont_discontinue_toclean(void);
 CAMLextern void caml_cont_insert_minor_todo(value cont);
 CAMLextern void caml_cont_process_minor_todo(
   void (*oldify_fn)(void*, value, volatile value*),
-  void* oldify_state,
-  void* domain);
+  void* oldify_state);
 CAMLextern void caml_cont_print_minor(const char *tag);
 
 #endif /* CAML_CONT_LL_H */
