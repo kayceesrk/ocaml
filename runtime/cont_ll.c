@@ -57,7 +57,6 @@ CAMLexport void caml_cont_insert_major_toclean(value cont)
 /* Debug: print major GC lists */
 CAMLexport void caml_cont_print_major(const char *tag)
 {
-#ifdef DEBUG
   caml_gc_log("cont_major[%s]: todo=%p toclean=%p", tag,
               (void*)Caml_state->cont_major_todo_head, (void*)Caml_state->cont_major_toclean_head);
 
@@ -68,7 +67,6 @@ CAMLexport void caml_cont_print_major(const char *tag)
   i = 1;
   for (value cur = Caml_state->cont_major_toclean_head; Is_block(cur); cur = next_cont(cur))
     caml_gc_log("  toclean[%d]: %p", i++, (void*)cur);
-#endif
 }
 
 /* Process todo list after marking: move unmarked to toclean, darken them.
@@ -145,18 +143,12 @@ CAMLexport void caml_cont_discontinue_toclean(void)
   const value *runtime_discontinue_fn_ptr = caml_named_value("Effect.runtime_discontinue");
   const value *exn_ptr = caml_named_value("Effect.Gc_unreachable");
 
-#ifdef DEBUG
-  if (runtime_discontinue_fn_ptr == NULL) {
-    caml_gc_log("cont_major: Effect.runtime_discontinue not registered");
+  /* Callbacks not registered yet - skip */
+  if (runtime_discontinue_fn_ptr == NULL || exn_ptr == NULL) {
+    caml_gc_log("cont_major: callbacks not registered, skipping");
     processing_discontinue = 0;
     CAMLreturn0;
   }
-  if (exn_ptr == NULL) {
-    caml_gc_log("cont_major: Effect.Gc_unreachable not registered");
-    processing_discontinue = 0;
-    CAMLreturn0;
-  }
-#endif
   
   runtime_discontinue_fn = *runtime_discontinue_fn_ptr;
   exn = *exn_ptr;
@@ -204,7 +196,6 @@ CAMLexport void caml_cont_insert_minor_todo(value cont)
 /* Debug: print minor todo list */
 CAMLexport void caml_cont_print_minor(const char *tag)
 {
-#ifdef DEBUG
   caml_gc_log("cont_minor[%s]: head=%p", tag, (void*)Caml_state->cont_minor_todo_head);
   
   int i = 1;
@@ -212,7 +203,6 @@ CAMLexport void caml_cont_print_minor(const char *tag)
     int forwarded = Is_young(cur) && (Hd_val(cur) == 0);
     caml_gc_log("  [%d]: %p young=%d fwd=%d", i++, (void*)cur, Is_young(cur), forwarded);
   }
-#endif
 }
 
 /* Process minor todo list during minor GC:
@@ -265,4 +255,84 @@ CAMLexport void caml_cont_process_minor_todo(
   
   Caml_state->cont_minor_todo_head = Val_long(0);
   caml_gc_log("cont_minor: done");
+}
+
+/* ========================================================================== */
+/* Domain Orphaning/Adoption                                                  */
+/* ========================================================================== */
+
+/* Find tail of a continuation list */
+Caml_inline value cont_list_tail(value head) {
+  value tail = Val_long(0);
+  while (Is_block(head)) {
+    tail = head;
+    head = next_cont(head);
+  }
+  return tail;
+}
+
+/* Orphan continuation lists to global pool (called from major_gc.c).
+   The orph_structs fields and orphaned_lock are defined in major_gc.c. */
+CAMLexport void caml_cont_orphan(
+  value _Atomic *orph_todo_head, value _Atomic *orph_todo_tail,
+  value _Atomic *orph_toclean_head, value _Atomic *orph_toclean_tail)
+{
+  value todo_head = Caml_state->cont_major_todo_head;
+  value toclean_head = Caml_state->cont_major_toclean_head;
+  
+  if (!Is_block(todo_head) && !Is_block(toclean_head)) return;
+  
+  caml_gc_log("cont_orphan: todo=%p toclean=%p", (void*)todo_head, (void*)toclean_head);
+  
+  /* Append todo list to orphan pool */
+  if (Is_block(todo_head)) {
+    value todo_tail = cont_list_tail(todo_head);
+    /* Link our tail to existing orphan head */
+    Field(todo_tail, 2) = *orph_todo_head;
+    /* If orphan was empty, update its tail */
+    if (!Is_block(*orph_todo_head)) {
+      *orph_todo_tail = todo_tail;
+    }
+    *orph_todo_head = todo_head;
+  }
+  
+  /* Append toclean list to orphan pool */
+  if (Is_block(toclean_head)) {
+    value toclean_tail = cont_list_tail(toclean_head);
+    Field(toclean_tail, 2) = *orph_toclean_head;
+    if (!Is_block(*orph_toclean_head)) {
+      *orph_toclean_tail = toclean_tail;
+    }
+    *orph_toclean_head = toclean_head;
+  }
+  
+  /* Clear domain's lists (minor list dies with domain's minor heap) */
+  Caml_state->cont_major_todo_head = Val_long(0);
+  Caml_state->cont_major_toclean_head = Val_long(0);
+}
+
+/* Adopt orphaned continuation lists - O(1) using tail pointers */
+CAMLexport void caml_cont_adopt_orphaned(
+  value orph_todo_head, value orph_todo_tail,
+  value orph_toclean_head, value orph_toclean_tail)
+{
+  if (!Is_block(orph_todo_head) && !Is_block(orph_toclean_head)) return;
+  
+  caml_gc_log("cont_adopt: todo=%p toclean=%p", (void*)orph_todo_head, (void*)orph_toclean_head);
+  
+  /* Adopt todo list - link orphan tail to our head, then set orphan head as new head */
+  if (Is_block(orph_todo_head)) {
+    CAMLassert(Is_block(orph_todo_tail));
+    Field(orph_todo_tail, 2) = Caml_state->cont_major_todo_head;
+    Caml_state->cont_major_todo_head = orph_todo_head;
+    caml_gc_log("  adopted todo: head=%p tail=%p", (void*)orph_todo_head, (void*)orph_todo_tail);
+  }
+  
+  /* Adopt toclean list */
+  if (Is_block(orph_toclean_head)) {
+    CAMLassert(Is_block(orph_toclean_tail));
+    Field(orph_toclean_tail, 2) = Caml_state->cont_major_toclean_head;
+    Caml_state->cont_major_toclean_head = orph_toclean_head;
+    caml_gc_log("  adopted toclean: head=%p tail=%p", (void*)orph_toclean_head, (void*)orph_toclean_tail);
+  }
 }

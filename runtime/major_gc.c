@@ -465,7 +465,12 @@ static intnat ephe_sweep (caml_domain_state* domain_state, intnat budget)
 static struct {
   value _Atomic ephe_list_live;
   struct caml_final_info * _Atomic final_info;
-} orph_structs = {0, NULL};
+  /* Orphaned continuation lists with tails for O(1) adoption */
+  value _Atomic cont_todo_head;
+  value _Atomic cont_todo_tail;
+  value _Atomic cont_toclean_head;
+  value _Atomic cont_toclean_tail;
+} orph_structs = {0, NULL, Val_long(0), Val_long(0), Val_long(0), Val_long(0)};
 
 static caml_plat_mutex orphaned_lock = CAML_PLAT_MUTEX_INITIALIZER;
 
@@ -584,11 +589,26 @@ void caml_orphan_finalisers (caml_domain_state* domain_state)
   }
 }
 
+void caml_orphan_continuations (caml_domain_state* domain_state)
+{
+  if (!Is_block(domain_state->cont_major_todo_head) &&
+      !Is_block(domain_state->cont_major_toclean_head)) {
+    return;
+  }
+
+  caml_plat_lock_blocking(&orphaned_lock);
+  caml_cont_orphan(&orph_structs.cont_todo_head, &orph_structs.cont_todo_tail,
+                   &orph_structs.cont_toclean_head, &orph_structs.cont_toclean_tail);
+  caml_plat_unlock(&orphaned_lock);
+}
+
 static int no_orphaned_work (void)
 {
   return
     atomic_load_acquire(&orph_structs.ephe_list_live) == 0 &&
-    atomic_load_acquire(&orph_structs.final_info) == NULL;
+    atomic_load_acquire(&orph_structs.final_info) == NULL &&
+    !Is_block(atomic_load_acquire(&orph_structs.cont_todo_head)) &&
+    !Is_block(atomic_load_acquire(&orph_structs.cont_toclean_head));
 }
 
 static void adopt_orphaned_work (int expected_status)
@@ -611,6 +631,16 @@ static void adopt_orphaned_work (int expected_status)
 
   f = orph_structs.final_info;
   orph_structs.final_info = NULL;
+
+  /* Grab orphaned continuation lists */
+  value orph_cont_todo_head = orph_structs.cont_todo_head;
+  value orph_cont_todo_tail = orph_structs.cont_todo_tail;
+  value orph_cont_toclean_head = orph_structs.cont_toclean_head;
+  value orph_cont_toclean_tail = orph_structs.cont_toclean_tail;
+  orph_structs.cont_todo_head = Val_long(0);
+  orph_structs.cont_todo_tail = Val_long(0);
+  orph_structs.cont_toclean_head = Val_long(0);
+  orph_structs.cont_toclean_tail = Val_long(0);
 
   caml_plat_unlock(&orphaned_lock);
 
@@ -661,6 +691,10 @@ static void adopt_orphaned_work (int expected_status)
     f = f->next;
     caml_stat_free (temp);
   }
+
+  /* Adopt orphaned continuations - O(1) using tail pointers */
+  caml_cont_adopt_orphaned(orph_cont_todo_head, orph_cont_todo_tail,
+                           orph_cont_toclean_head, orph_cont_toclean_tail);
 }
 
 /*******************************************************************************
@@ -2110,13 +2144,17 @@ mark_again:
 
       /* Process continuations: move unmarked from todo to toclean.
          If any were darkened, mark again to drain the mark stack. */
+#ifdef DEBUG
       caml_cont_print_major("before-process");
+#endif
       if (caml_cont_mark_and_shift_toclean()) {
         if (!domain_state->marking_done &&
             get_major_slice_work(mode) > 0)
           goto mark_again;
       }
+#ifdef DEBUG
       caml_cont_print_major("after-process");
+#endif
     }
 
     /* Complete GC phase */

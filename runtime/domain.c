@@ -2192,6 +2192,7 @@ void caml_domain_terminate(bool last)
     CAMLassert (caml_gc_phase != Phase_sweep_main);
     caml_orphan_ephemerons(domain_state);
     caml_orphan_finalisers(domain_state);
+    caml_orphan_continuations(domain_state);
 
     /* Orphaning ephemerons and finalizers may create new marking or
        sweeping work, so we may need to mark and/or sweep again. */
