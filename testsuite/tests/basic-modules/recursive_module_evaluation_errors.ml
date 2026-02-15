@@ -181,3 +181,23 @@ Line 5, characters 4-15:
         ^^^^^^^^^^^
   Module "M1" defines an unsafe value, "List.nil" .
 |}]
+
+module rec F : functor (X:sig type t end) -> sig
+  type t = X.t * X.t
+  type u = [`C of F(X).u]
+
+  val unsafe : int
+end = F;;
+
+[%%expect{|
+Line 6, characters 6-7:
+6 | end = F;;
+          ^
+Error: Cannot safely evaluate the definition of the following cycle
+       of recursively-defined modules: F -> F.
+       There are no safe modules in this cycle (see manual section 12.2).
+Line 6, characters 6-7:
+6 | end = F;;
+          ^
+  Module "F" defines an unsafe functor, "F" .
+|}]

@@ -307,6 +307,17 @@ Line 2, characters 8-11:
 Error: Only variables are allowed as left-hand side of "let rec"
 |}]
 
+(** Alias pattern in let rec
+    (accepted in OCaml versions up to and including 5.4) *)
+let rec (_ as f) = fun () -> f ()
+
+[%%expect {|
+Line 1, characters 8-16:
+1 | let rec (_ as f) = fun () -> f ()
+            ^^^^^^^^
+Error: Only variables are allowed as left-hand side of "let rec"
+|}]
+
 (** Non-linear pattern *)
 
 let quadratic (x,x) = x * x

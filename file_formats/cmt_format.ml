@@ -55,10 +55,10 @@ type cmt_infos = {
   cmt_sourcefile : string option;
   cmt_builddir : string;
   cmt_loadpath : Load_path.paths;
-  cmt_source_digest : Digest.t option;
+  cmt_source_digest : Digest.BLAKE128.t option;
   cmt_initial_env : Env.t;
-  cmt_imports : (string * Digest.t option) list;
-  cmt_interface_digest : Digest.t option;
+  cmt_imports : (string * Digest.BLAKE128.t option) list;
+  cmt_interface_digest : Digest.BLAKE128.t option;
   cmt_use_summaries : bool;
   cmt_uid_to_decl : item_declaration Shape.Uid.Tbl.t;
   cmt_impl_shape : Shape.t option; (* None for mli *)
@@ -110,10 +110,6 @@ let iter_on_declarations ~(f: Shape.Uid.t -> item_declaration -> unit) = {
   item_declaration = (fun _sub decl -> iter_on_declaration f decl);
 }
 
-let need_to_clear_env =
-  try ignore (Sys.getenv "OCAML_BINANNOT_WITHENV"); false
-  with Not_found -> true
-
 let keep_only_summary = Env.keep_only_summary
 
 let cenv =
@@ -132,17 +128,14 @@ let clear_part = function
   | Partial_module_type s -> Partial_module_type (cenv.module_type cenv s)
 
 let clear_env binary_annots =
-  if need_to_clear_env then
-    match binary_annots with
-    | Implementation s -> Implementation (cenv.structure cenv s)
-    | Interface s -> Interface (cenv.signature cenv s)
-    | Packed _ -> binary_annots
-    | Partial_implementation array ->
-        Partial_implementation (Array.map clear_part array)
-    | Partial_interface array ->
-        Partial_interface (Array.map clear_part array)
-
-  else binary_annots
+  match binary_annots with
+  | Implementation s -> Implementation (cenv.structure cenv s)
+  | Interface s -> Interface (cenv.signature cenv s)
+  | Packed _ -> binary_annots
+  | Partial_implementation array ->
+      Partial_implementation (Array.map clear_part array)
+  | Partial_interface array ->
+      Partial_interface (Array.map clear_part array)
 
 (* Every typedtree node with a located longident corresponding to user-facing
    syntax should be indexed. *)
@@ -477,7 +470,7 @@ let save_cmt target binary_annots initial_env cmi shape =
          in
          let cmt_annots = clear_env binary_annots in
          let cmt_uid_to_decl = index_declarations cmt_annots in
-         let source_digest = Option.map Digest.file sourcefile in
+         let source_digest = Option.map Digest.BLAKE128.file sourcefile in
          let cmt_args =
            let cmt_args = Array.copy Sys.argv in
            cmt_args.(0) <- Location.rewrite_absolute_path Sys.argv.(0);
@@ -492,11 +485,10 @@ let save_cmt target binary_annots initial_env cmi shape =
            cmt_builddir = Location.rewrite_absolute_path (Sys.getcwd ());
            cmt_loadpath = Load_path.get_paths ();
            cmt_source_digest = source_digest;
-           cmt_initial_env = if need_to_clear_env then
-               keep_only_summary initial_env else initial_env;
+           cmt_initial_env = keep_only_summary initial_env;
            cmt_imports = List.sort compare (Env.imports ());
            cmt_interface_digest = this_crc;
-           cmt_use_summaries = need_to_clear_env;
+           cmt_use_summaries = true;
            cmt_uid_to_decl;
            cmt_impl_shape = shape;
            cmt_ident_occurrences;

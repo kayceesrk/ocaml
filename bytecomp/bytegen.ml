@@ -439,7 +439,8 @@ let comp_primitive stack_info p sz args =
        | Ostype_unix -> "ostype_unix"
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
-       | Backend_type -> "backend_type" in
+       | Backend_type -> "backend_type"
+       | Standard_library_default -> "standard_library_default" in
      Kccall(Printf.sprintf "caml_sys_const_%s" const_name, 1)
   | Pisint -> Kisint
   | Pisout -> Kisout
@@ -570,7 +571,7 @@ let rec comp_expr stack_info env exp sz cont =
       let getmethod, args' =
         if kind = Self then (Kgetmethod, met::obj::args) else
         match met with
-          Lconst(Const_base(Const_int n)) -> (Kgetpubmet n, obj::args)
+          Lconst(Const_int n) -> (Kgetpubmet n, obj::args)
         | _ -> (Kgetdynmet, met::obj::args)
       in
       if is_tailcall cont then
@@ -667,17 +668,17 @@ let rec comp_expr stack_info env exp sz cont =
       end
   | Lprim(Praise k, [arg], _) ->
       comp_expr stack_info env arg sz (Kraise k :: discard_dead_code cont)
-  | Lprim(Paddint, [arg; Lconst(Const_base(Const_int n))], _)
+  | Lprim(Paddint, [arg; Lconst(Const_int n)], _)
     when is_immed n ->
       comp_expr stack_info env arg sz (Koffsetint n :: cont)
-  | Lprim(Psubint, [arg; Lconst(Const_base(Const_int n))], _)
+  | Lprim(Psubint, [arg; Lconst(Const_int n)], _)
     when is_immed (-n) ->
       comp_expr stack_info env arg sz (Koffsetint (-n) :: cont)
   | Lprim (Poffsetint n, [arg], _)
     when not (is_immed n) ->
       comp_expr stack_info env arg sz
         (Kpush::
-         Kconst (Const_base (Const_int n))::
+         Kconst (Const_int n)::
          Kaddint::cont)
   | Lprim(Pmakearray (kind, _), args, loc) ->
       let cont = add_pseudo_event loc !compunit_name cont in
@@ -1043,7 +1044,7 @@ let comp_block env exp sz cont =
   let code = comp_expr stack_info env exp sz cont in
   let used_safe = !(stack_info.max_stack_used) + Config.stack_safety_margin in
   if used_safe > Config.stack_threshold then
-    Kconst(Const_base(Const_int used_safe)) ::
+    Kconst(Const_int used_safe) ::
     Kccall("caml_ensure_stack_capacity", 1) ::
     code
   else

@@ -167,6 +167,8 @@ let primitives_table =
     "%ostype_unix", Primitive ((Pctconst Ostype_unix), 1);
     "%ostype_win32", Primitive ((Pctconst Ostype_win32), 1);
     "%ostype_cygwin", Primitive ((Pctconst Ostype_cygwin), 1);
+    "%standard_library_default",
+    Primitive ((Pctconst Standard_library_default), 1);
     "%frame_pointers", Frame_pointers;
     "%negint", Primitive (Pnegint, 1);
     "%succint", Primitive ((Poffsetint 1), 1);
@@ -658,9 +660,9 @@ let lambda_of_loc kind sloc =
   | Loc_POS ->
     Lconst (Const_block (0, [
           Const_immstring file;
-          Const_base (Const_int lnum);
-          Const_base (Const_int cnum);
-          Const_base (Const_int enum);
+          Const_int lnum;
+          Const_int cnum;
+          Const_int enum;
         ]))
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
@@ -672,7 +674,7 @@ let lambda_of_loc kind sloc =
     let loc = Printf.sprintf "File %S, line %d, characters %d-%d"
         file lnum cnum enum in
     Lconst (Const_immstring loc)
-  | Loc_LINE -> Lconst (Const_base (Const_int lnum))
+  | Loc_LINE -> Lconst (Const_int lnum)
   | Loc_FUNCTION ->
     let scope_name = Debuginfo.Scoped_location.string_of_scoped_location sloc in
     Lconst (Const_immstring scope_name)

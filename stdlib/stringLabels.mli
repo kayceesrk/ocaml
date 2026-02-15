@@ -103,6 +103,12 @@ external get : string -> int -> char = "%string_safe_get"
 
     @raise Invalid_argument if [i] not an index of [s]. *)
 
+val of_char : char -> string
+(** [of_char c] is [c] as a string.
+
+    @since 5.5
+*)
+
 val of_bytes : bytes -> string
 (** Return a new string that contains the same bytes as the given byte
     sequence.
@@ -153,6 +159,11 @@ val compare : t -> t -> int
 (** [compare s0 s1] sorts [s0] and [s1] in lexicographical order. [compare]
     behaves like {!Stdlib.compare} on strings but may be more efficient. *)
 
+val is_empty : string -> bool
+(** [is_empty s] is [true] if and only if [s] is an empty string.
+
+    @since 5.5 *)
+
 val starts_with :
   prefix (* comment thwarts tools/sync_stdlib_docs *) :string -> string -> bool
 (** [starts_with ][~prefix s] is [true] if and only if [s] starts with
@@ -191,6 +202,84 @@ val sub : string -> pos:int -> len:int -> string
 
     @raise Invalid_argument if [pos] and [len] do not designate a valid
     substring of [s]. *)
+
+(** {1:splitting Splitting strings} *)
+
+(** {2:splitting_mag Splitting with magnitudes} *)
+
+val take_first : int -> string -> string
+(** [take_first n s] are the first [n] bytes of [s]. This is [s] if
+    [n >= length s] and [""] if [n <= 0].
+
+    @since 5.5 *)
+
+val take_last : int -> string -> string
+(** [take_last n s] are the last [n] bytes of [s].  This is [s] if
+    [n >= length s] and [""] if [n <= 0].
+
+    @since 5.5 *)
+
+val drop_first : int -> string -> string
+(** [drop_first n s] is [s] without the first [n] bytes of [s]. This is [""]
+    if [n >= length s] and [s] if [n <= 0].
+
+    @since 5.5 *)
+
+val drop_last : int -> string -> string
+(** [drop_last n s] is [s] without the last [n] bytes of [s]. This is [""]
+    if [n >= length s] and [s] if [n <= 0].
+
+    @since 5.5 *)
+
+val cut_first : int -> string -> string * string
+(** [cut_first n v] is [(take_first n v, drop_first n v)].
+
+    @since 5.5 *)
+
+val cut_last : int -> string -> string * string
+(** [cut_last n v] is [(drop_last n v, take_last n v)].
+
+    @since 5.5 *)
+
+(** {2:splitting_preds Splitting with predicates} *)
+
+val take_first_while : (char -> bool) -> string -> string
+(** [take_first_while p s] is the first consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val take_last_while : (char -> bool) -> string -> string
+(** [take_last_while p s] is the last consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val drop_first_while : (char -> bool) -> string -> string
+(** [drop_first_while p s] is [s] without the first consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val drop_last_while : (char -> bool) -> string -> string
+(** [drop_last_while p s] is [s] without the last consecutive bytes of [s]
+    satisfying the predicate [p].
+
+    @since 5.5 *)
+
+val cut_first_while : (char -> bool) -> string -> string * string
+(** [cut_first_while p s] is
+    [(take_first_while p s, drop_first_while p s)].
+
+    @since 5.5 *)
+
+val cut_last_while : (char -> bool) -> string -> string * string
+(** [cut_last_while p s] is
+    [(drop_last_while p s, take_last_while p s)].
+
+    @since 5.5 *)
+
+(** {2:splitting_sep Splitting with separators} *)
 
 val split_on_char : sep:char -> string -> string list
 (** [split_on_char ~sep s] is the list of all (possibly empty)
@@ -296,7 +385,27 @@ val iteri : f:(int -> char -> unit) -> string -> unit
 
     @since 4.00 *)
 
-(** {1:searching Searching} *)
+(** {1:finding_indices Finding indices} *)
+
+val find_first_index : (char -> bool) -> ?start:int -> string -> int option
+(** [find_first_index p ~start s] is the index of the first character
+    of [s] that satisfies predicate [p] at or after the index or
+    position [start] (defaults to [0]).
+
+    If [start] is [length s], the result is always [None].
+
+    @raise Invalid_argument if [start] is not a valid position of [s].
+
+    @since 5.5 *)
+
+val find_last_index : (char -> bool) -> ?start:int -> string -> int option
+(** [find_last_index p ~start s] is the index of the last character of
+    [s] that satisfies predicate [p] at or before the index or
+    position [start] (defaults to [length s]).
+
+    @raise Invalid_argument if [start] is not a valid position of [s].
+
+    @since 5.5 *)
 
 val index_from : string -> int -> char -> int
 (** [index_from s i c] is the index of the first occurrence of [c] in
@@ -304,7 +413,6 @@ val index_from : string -> int -> char -> int
 
     @raise Not_found if [c] does not occur in [s] after position [i].
     @raise Invalid_argument if [i] is not a valid position in [s]. *)
-
 
 val index_from_opt : string -> int -> char -> int option
 (** [index_from_opt s i c] is the index of the first occurrence of [c]
@@ -342,6 +450,76 @@ val rindex_opt : string -> char -> int option
 (** [rindex_opt s c] is {!String.rindex_from_opt}[ s (length s - 1) c].
 
     @since 4.05 *)
+
+(** {1:find_subs Finding substrings}
+
+    {b Note.} To find the same [sub] string multiple times, partially
+    applying the [~sub] argument of these functions and using the
+    resulting function repeatedly is more efficient *)
+
+val find_first :
+  sub (* comment thwarts tools/sync_stdlib_docs *) :string ->
+  ?start:int -> string -> int option
+(** [find_first ~sub ~start s] is the starting position of the first
+    occurrence of [sub] in [s] at or after the index or position [start]
+    (defaults to [0]).
+
+    If [sub] is [""] the result is [Some start]. The result of the
+    function is always a valid index of [s] except when [sub] is
+    [""] and [start] is [length s].
+
+    @raise Invalid_argument if [start] is not a valid position of [s].
+
+    @since 5.5 *)
+
+val find_last :
+  sub (* comment thwarts tools/sync_stdlib_docs *) :string ->
+  ?start:int -> string -> int option
+(** [find_last ~sub ~start s] is the starting position of the last
+    occurrence of [sub] in [s] at or before the index or position
+    [start] (defaults to [String.length s]).
+
+    If [sub] is [""] the result is [Some start]. The result of the
+    function is always a valid index of [s] except when [sub] is
+    [""] and [start] is [length s].
+
+    @raise Invalid_argument if [start] is not a valid position of [s].
+
+    @since 5.5 *)
+
+val find_all :
+  sub (* comment thwarts tools/sync_stdlib_docs *) :string ->
+  f:(int -> 'acc -> 'acc) ->
+  ?start:int -> string -> 'acc -> 'acc
+(** [find_all ~sub f ~start s acc], starting with [acc], folds [f] by
+    increasing index order over all non-overlapping starting positions
+    of [sub] in [s] at or after the index or position [start]
+    (defaults to [0]). The result is [acc] if [sub] could not be found
+    in [s].
+
+    If [sub] is [""], [f] gets invoked on all positions of [s] at or after
+    [start].
+
+    @raise Invalid_argument if [start] is not a valid position of [s].
+
+    @since 5.5 *)
+
+val rfind_all :
+  sub (* comment thwarts tools/sync_stdlib_docs *) :string ->
+  f:(int -> 'acc -> 'acc) ->
+  ?start:int -> string -> 'acc -> 'acc
+(** [rfind_all ~sub f ~start s acc], starting with [acc], folds [f] by
+    decreasing index order over all non-overlapping starting
+    positions of [sub] in [s] at or before the index or position
+    [start] (defaults to [String.length s]). The result is [acc] if
+    [sub] could not be found in [s].
+
+    If [sub] is [""], [f] gets invoked on all positions of [s] at
+    or before [start].
+
+    @raise Invalid_argument if [start] is not a valid position of [s].
+
+    @since 5.5 *)
 
 (** {1 Strings and Sequences} *)
 
@@ -413,7 +591,7 @@ val edit_distance : ?limit:int -> t -> t -> int
     {{:https://unicode.org/glossary/#normalization_form_c}NFC} gives
     better results.
 
-    {b Note.} This implements the simpler Optimal String Alignement (OSA)
+    {b Note.} This implements the simpler Optimal String Alignment (OSA)
     distance, not the Damerau-Levenshtein distance. With this function
     ["ca"] and ["abc"] have a distance of 3 not 2.
 

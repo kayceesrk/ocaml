@@ -426,7 +426,7 @@ val save_signature_with_imports:
            imported units with their CRCs. *)
 
 (* Return the CRC of the interface of the given compilation unit *)
-val crc_of_unit: modname -> Digest.t
+val crc_of_unit: modname -> Digest.BLAKE128.t
 
 (* Return the set of compilation units imported, with their CRC *)
 val imports: unit -> crcs
