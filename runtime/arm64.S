@@ -449,6 +449,22 @@ G(name):
         ldr     TRAP_PTR, Caml_state(exn_handler)
 .endm
 
+/* Save return value registers. To cover all possible function returns, save
+   both x0 and d0:d1. */
+.macro TSAN_PUSH_RETURN_REGS
+        stp     x0, x1, [sp, -16]!
+        CFI_ADJUST(16)
+        stp     d0, d1, [sp, -16]!
+        CFI_ADJUST(16)
+.endm
+
+.macro TSAN_POP_RETURN_REGS
+        ldp     d0, d1, [sp], 16
+        CFI_ADJUST(-16)
+        ldp     x0, x1, [sp], 16
+        CFI_ADJUST(-16)
+.endm
+
 #else /* } { */
 
 .macro TSAN_ENTER_FUNCTION
@@ -461,6 +477,12 @@ G(name):
 .endm
 
 .macro TSAN_RESTORE_CALLER_REGS
+.endm
+
+.macro TSAN_PUSH_RETURN_REGS
+.endm
+
+.macro TSAN_POP_RETURN_REGS
 .endm
 
 #endif /* } WITH_THREAD_SANITIZER */
@@ -590,21 +612,9 @@ FUNCTION(caml_c_call)
         ldr     TRAP_PTR, Caml_state(exn_handler)
     /* Load ocaml stack */
         SWITCH_C_TO_OCAML
-#if defined(WITH_THREAD_SANITIZER)
-    /* Save return value registers. Since the called function could be
-       anything, it may have returned its result (if any) either in x0
-       or d0:d1. */
-        stp     x0, x1, [sp, -16]!
-        CFI_ADJUST(16)
-        stp     d0, d1, [sp, -16]!
-        CFI_ADJUST(16)
+        TSAN_PUSH_RETURN_REGS
         TSAN_EXIT_FUNCTION
-    /* Restore return value registers */
-        ldp     d0, d1, [sp], 16
-        CFI_ADJUST(-16)
-        ldp     x0, x1, [sp], 16
-        CFI_ADJUST(-16)
-#endif
+        TSAN_POP_RETURN_REGS
     /* Return */
         LEAVE_FUNCTION
         NORMALIZE_RETURN_ADDRESS
@@ -621,6 +631,9 @@ FUNCTION(caml_c_call_stack_args)
         C stack args : begin=STACK_ARG_BEGIN
                        end=STACK_ARG_END */
         ENTER_FUNCTION
+        TSAN_SAVE_CALLER_REGS
+        TSAN_ENTER_FUNCTION
+        TSAN_RESTORE_CALLER_REGS
     /* Switch from OCaml to C */
         SWITCH_OCAML_TO_C
     /* Make the exception handler alloc ptr available to the C code */
@@ -633,6 +646,9 @@ FUNCTION(caml_c_call_stack_args)
         ldr     TRAP_PTR, Caml_state(exn_handler)
     /* Switch from C to OCaml */
         SWITCH_C_TO_OCAML
+        TSAN_PUSH_RETURN_REGS /* Save returned value. */
+        TSAN_EXIT_FUNCTION
+        TSAN_POP_RETURN_REGS
     /* Return */
         LEAVE_FUNCTION
         NORMALIZE_RETURN_ADDRESS
@@ -649,6 +665,15 @@ FUNCTION(caml_c_call_copy_stack_args)
         CFI_STARTPROC
         ENTER_FUNCTION
         CFI_DEF_CFA_REGISTER(DW_REG_x29)
+#if defined(WITH_THREAD_SANITIZER)
+        TSAN_SAVE_CALLER_REGS
+        /* TSAN_ENTER_FUNCTION, but without switching stacks */
+        mov     x0, x30        /* arg1: return address in caller */
+        TSAN_SETUP_C_CALL
+        bl      G(caml_tsan_func_entry_asm)
+        TSAN_CLEANUP_AFTER_C_CALL
+        TSAN_RESTORE_CALLER_REGS
+#endif
     /* Copy arguments from OCaml to C stack
        NB: STACK_ARG_{BEGIN,END} are 16-byte aligned */
 1:      sub     STACK_ARG_END, STACK_ARG_END, 16
@@ -659,6 +684,14 @@ FUNCTION(caml_c_call_copy_stack_args)
         b       1b
 2:  /* Call the function */
         blr     ADDITIONAL_ARG
+#if defined(WITH_THREAD_SANITIZER)
+        TSAN_PUSH_RETURN_REGS /* Save returned value. */
+        /* TSAN_EXIT_FUNCTION, but without switching stacks */
+        TSAN_SETUP_C_CALL
+        bl      G(caml_tsan_func_exit_asm)
+        TSAN_CLEANUP_AFTER_C_CALL
+        TSAN_POP_RETURN_REGS
+#endif
     /* Restore stack */
         mov     sp, x29
         CFI_DEF_CFA_REGISTER(DW_REG_sp)

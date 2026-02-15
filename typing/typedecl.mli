@@ -47,12 +47,26 @@ val transl_with_constraint:
 val transl_package_constraint:
   loc:Location.t -> Env.t -> type_expr -> Types.type_declaration
 
-val abstract_type_decl: injective:bool -> int -> type_declaration
+val abstract_type_decl:
+    injective:bool -> explanation:Types.type_origin -> int -> type_declaration
+
+(** Approximate a list of type declarations with abstract types of the
+    given origin. *)
 val approx_type_decl:
-    Parsetree.type_declaration list ->
+    explanation:Types.type_origin -> Parsetree.type_declaration list ->
                                   (Ident.t * type_declaration) list
+
+(** [check_recmod_typedecl ~abs_env env loc recmod_ids path decl]
+   - [recmod_ids] is the list of recursively-defined module idents.
+   - [path, decl] is the type declaration to be checked.
+   - [abs_env] is an abstract environment without physical cycles. It is used
+      as a printing environment.
+   - [env] is the main environment, which may contain cycles introduced by the
+      recursive module definitions.
+*)
 val check_recmod_typedecl:
-    Env.t -> Location.t -> Ident.t list -> Path.t -> type_declaration -> unit
+    abs_env:Env.t -> Env.t -> Location.t -> Ident.t list -> Path.t ->
+    type_declaration -> unit
 val check_coherence:
     Env.t -> Location.t -> Path.t -> type_declaration -> unit
 

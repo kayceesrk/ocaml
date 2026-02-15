@@ -134,6 +134,16 @@ let not_msvc = make
     "not using MSVC / clang-cl"
     "using MSVC / clang-cl")
 
+let is_clang =
+  List.mem "clang" (String.split_on_char '-' Ocamltest_config.c_compiler_vendor)
+
+let not_clang = make
+  ~name:"not-clang"
+  ~description:"Pass if not using clang"
+  (Actions_helpers.pass_or_skip (not is_clang)
+    "not using clang"
+    "using clang")
+
 (* windows _passes_ on Cygwin; target_windows _skips_ for Cygwin *)
 
 let target_windows = make
@@ -295,6 +305,13 @@ let has_symlink = make
     "symlinks available"
     "symlinks not available")
 
+let not_root = make
+  ~name:"not-root"
+  ~description:"Skip test if the current user is root"
+  (Actions_helpers.pass_or_skip (Unix.getuid () <> 0)
+    "current user is not root"
+    "current user is root")
+
 let setup_build_env = make
   ~name:"setup-build-env"
   ~description:"Create a dedicated directory for the test and populates it"
@@ -405,6 +422,7 @@ let _ =
     windows;
     not_windows;
     not_msvc;
+    not_clang;
     target_windows;
     not_target_windows;
     bsd;
@@ -415,6 +433,7 @@ let _ =
     arch32;
     arch64;
     has_symlink;
+    not_root;
     setup_build_env;
     setup_simple_build_env;
     run;

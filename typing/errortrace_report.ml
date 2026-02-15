@@ -446,6 +446,11 @@ let warn_on_missing_def env ppf t =
               "@,@[<hov>Type %a was considered abstract@ when checking\
                @ constraints@ in this@ recursive type definition.@]"
               pp_path p
+        | Approx_recmod ->
+            fprintf ppf
+              "@,@[<hov>Type %a was considered abstract@ when checking\
+               @ constraints@ in this@ recursive module definition.@]"
+              pp_path p
         | Definition | Existential _ -> ()
       end
   | _ -> ()

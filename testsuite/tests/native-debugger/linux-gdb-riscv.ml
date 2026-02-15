@@ -1,6 +1,7 @@
 (* TEST
    native-compiler;
    linux;
+   not-clang; (* Skip, clang is tested on macOS *)
    no-tsan; (* Skip, TSan inserts extra frames into backtraces *)
    arch_riscv;
    script = "sh ${test_source_directory}/has_gdb.sh";

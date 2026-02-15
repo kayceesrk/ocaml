@@ -230,11 +230,11 @@ let pp_clear_queue state =
 
 (* Pp_infinity: large value for default tokens size.
 
-   Pp_infinity is documented as being greater than 1e10; to avoid
+   Pp_infinity is documented as being greater than 1e9; to avoid
    confusion about the word 'greater', we choose pp_infinity greater
-   than 1e10 + 1; for correct handling of tests in the algorithm,
-   pp_infinity must be even one more than 1e10 + 1; let's stand on the
-   safe side by choosing 1.e10+10.
+   than 1e9 + 1; for correct handling of tests in the algorithm,
+   pp_infinity must be even one more than 1e9 + 1; let's stand on the
+   safe side by choosing 1e9 + 10.
 
    Pp_infinity could probably be 1073741823 that is 2^30 - 1, that is
    the minimal upper bound for integers; now that max_int is defined,
@@ -244,7 +244,7 @@ let pp_clear_queue state =
    must carefully double-check all the integer arithmetic operations
    that involve pp_infinity, since any overflow would wreck havoc the
    pretty-printing algorithm's invariants. Given that this arithmetic
-   correctness check is difficult and error prone and given that 1e10
+   correctness check is difficult and error prone and given that 1e9
    + 1 is in practice large enough, there is no need to attempt to set
    pp_infinity to the theoretically maximum limit. It is not worth the
    burden ! *)
@@ -1575,6 +1575,31 @@ let kasprintf k (Format (fmt, _)) =
 
 
 let asprintf fmt = kasprintf id fmt
+
+(*
+
+  Defining heterogeneous list flavours of functions defined above
+
+*)
+
+module Args = Args
+
+let lfprintf ppf (Format (fmt, _)) args =
+  make_lprintf (output_acc ppf) End_of_acc fmt args
+
+let lprintf fmt args =
+  lfprintf (DLS.get std_formatter_key) fmt args
+
+let leprintf fmt args =
+  lfprintf (DLS.get err_formatter_key) fmt args
+
+let lasprintf (Format (fmt, _)) args =
+  let b = pp_make_buffer () in
+  let ppf = formatter_of_buffer b in
+  let k acc = output_acc ppf acc; flush_buffer_formatter b ppf in
+  make_lprintf k End_of_acc fmt args
+
+let ldprintf fmt args ppf = lfprintf ppf fmt args
 
 (* Flushing standard formatters at end of execution. *)
 

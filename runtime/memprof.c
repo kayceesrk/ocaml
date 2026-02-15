@@ -1202,7 +1202,7 @@ static void rand_init(memprof_domain_t domain)
  * * lambda].  We could use a more involved algorithm, but this should
  * be good enough since, in the typical use case, [lambda] << 0.01 and
  * therefore the generation of the binomial variable is amortized by
- * the initialialization of the corresponding block.
+ * the initialization of the corresponding block.
  *
  * If needed, we could use algorithm BTRS from the paper:
  *  Hormann, Wolfgang. "The generation of binomial random variates."
@@ -1705,23 +1705,6 @@ static value capture_callstack_GC(memprof_domain_t domain, int alloc_idx)
   return res;
 }
 
-/* Given a stashed callstack, copy it to the Caml heap and free the
- * stash. Given a non-stashed callstack, simply return it. */
-
-static value unstash_callstack(value callstack)
-{
-  CAMLparam1(callstack);
-  if (Is_long(callstack)) { /* stashed on C heap */
-    callstack_stash_t stash = Ptr_val(callstack);
-    callstack = caml_alloc(stash->frames, 0);
-    for (size_t i = 0; i < stash->frames; ++i) {
-      Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
-    }
-    caml_stat_free(stash);
-  }
-  CAMLreturn(callstack);
-}
-
 /**** Running callbacks ****/
 
 /* Runs a single callback, in thread `thread`, for entry number `i` in
@@ -1810,12 +1793,26 @@ static caml_result run_alloc_callback_res(
   entry_t e = &es->t[i];
   CAMLassert(e->deallocated || e->offset || Is_block(e->block));
 
-  e->user_data = unstash_callstack(e->user_data);
   value sample_info = caml_alloc_small(4, 0);
   Field(sample_info, 0) = Val_long(e->samples);
   Field(sample_info, 1) = Val_long(e->wosize);
   Field(sample_info, 2) = Val_long(e->source);
   Field(sample_info, 3) = e->user_data;
+
+  if (Is_long(e->user_data)) {
+    /* Callstack stashed on C heap, so copy it to OCaml heap */
+    CAMLparam1(sample_info);
+    CAMLlocal1(callstack);
+    callstack_stash_t stash = Ptr_val(e->user_data);
+    callstack = caml_alloc(stash->frames, 0);
+    for (size_t i = 0; i < stash->frames; ++i) {
+      Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
+    }
+    caml_stat_free(stash);
+    Store_field(sample_info, 3, callstack);
+    CAMLdrop;
+  }
+
   value callback =
     e->alloc_young ? Alloc_minor(es->config) : Alloc_major(es->config);
   return run_callback_res(thread, es, i, callback, sample_info, CB_ALLOC);
@@ -2216,7 +2213,7 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
   CAMLparam3(lv, szv, tracker);
-  CAMLlocal2(one_log1m_lambda_v, config);
+  CAMLlocal3(lambda_v, one_log1m_lambda_v, config);
 
   double lambda = Double_val(lv);
   intnat sz = Long_val(szv);
@@ -2236,12 +2233,16 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
     one_log1m_lambda = MIN_ONE_LOG1M_LAMBDA; /* negative infinity */
   }
 
-  one_log1m_lambda_v = caml_copy_double(one_log1m_lambda);
+  lambda_v = caml_alloc_shr(Double_wosize, Double_tag);
+  Store_double_val(lambda_v, lambda);
+
+  one_log1m_lambda_v = caml_alloc_shr(Double_wosize, Double_tag);
+  Store_double_val(one_log1m_lambda_v, one_log1m_lambda);
 
   config = caml_alloc_shr(CONFIG_FIELDS, 0);
   caml_initialize(&Field(config, CONFIG_FIELD_STATUS),
                   Val_int(CONFIG_STATUS_SAMPLING));
-  caml_initialize(&Field(config, CONFIG_FIELD_LAMBDA), lv);
+  caml_initialize(&Field(config, CONFIG_FIELD_LAMBDA), lambda_v);
   caml_initialize(&Field(config, CONFIG_FIELD_1LOG1ML), one_log1m_lambda_v);
   caml_initialize(&Field(config, CONFIG_FIELD_STACK_FRAMES), szv);
   for (int i = CONFIG_FIELD_FIRST_CALLBACK;

@@ -21,14 +21,13 @@ open Lambda
 
 
 let rec struct_const ppf = function
-  | Const_base(Const_int n) -> fprintf ppf "%i" n
-  | Const_base(Const_char c) -> fprintf ppf "%C" c
-  | Const_base(Const_string (s, _, _)) -> fprintf ppf "%S" s
-  | Const_immstring s -> fprintf ppf "#%S" s
-  | Const_base(Const_float f) -> fprintf ppf "%s" f
-  | Const_base(Const_int32 n) -> fprintf ppf "%lil" n
-  | Const_base(Const_int64 n) -> fprintf ppf "%LiL" n
-  | Const_base(Const_nativeint n) -> fprintf ppf "%nin" n
+  | Const_int n -> fprintf ppf "%i" n
+  | Const_char c -> fprintf ppf "%C" c
+  | Const_immstring s -> fprintf ppf "%S" s
+  | Const_float f -> fprintf ppf "%s" f
+  | Const_int32 n -> fprintf ppf "%lil" n
+  | Const_int64 n -> fprintf ppf "%LiL" n
+  | Const_nativeint n -> fprintf ppf "%nin" n
   | Const_block(tag, []) ->
       fprintf ppf "[%i]" tag
   | Const_block(tag, sc1::scl) ->
@@ -270,7 +269,8 @@ let primitive ppf = function
        | Ostype_unix -> "ostype_unix"
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
-       | Backend_type -> "backend_type" in
+       | Backend_type -> "backend_type"
+       | Standard_library_default -> "standard_library_default" in
      fprintf ppf "sys.constant_%s" const_name
   | Pisint -> fprintf ppf "isint"
   | Pisout -> fprintf ppf "isout"
