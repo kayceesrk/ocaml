@@ -216,7 +216,6 @@ stdlib__Digest.cmi : digest.mli
 stdlib__Domain.cmo : domain.ml \
     stdlib__Sys.cmi \
     stdlib.cmi \
-    stdlib__Printexc.cmi \
     stdlib__Obj.cmi \
     stdlib__Mutex.cmi \
     stdlib__List.cmi \
@@ -227,7 +226,6 @@ stdlib__Domain.cmo : domain.ml \
 stdlib__Domain.cmx : domain.ml \
     stdlib__Sys.cmx \
     stdlib.cmx \
-    stdlib__Printexc.cmx \
     stdlib__Obj.cmx \
     stdlib__Mutex.cmx \
     stdlib__List.cmx \
@@ -804,7 +802,6 @@ stdlib__String.cmo : string.ml \
     stdlib.cmi \
     stdlib__List.cmi \
     stdlib__Int.cmi \
-    stdlib__Char.cmi \
     stdlib__Bytes.cmi \
     stdlib__Array.cmi \
     stdlib__String.cmi
@@ -813,7 +810,6 @@ stdlib__String.cmx : string.ml \
     stdlib.cmx \
     stdlib__List.cmx \
     stdlib__Int.cmx \
-    stdlib__Char.cmx \
     stdlib__Bytes.cmx \
     stdlib__Array.cmx \
     stdlib__String.cmi

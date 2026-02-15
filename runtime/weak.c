@@ -139,7 +139,7 @@ static void do_check_key_clean(value e, mlsize_t offset)
     if (Tag_val(elt) == Infix_tag) elt -= Infix_offset_val(elt);
     if (is_unmarked(elt)) {
       Field(e, offset) = caml_ephe_none;
-      atomic_store_relaxed(Ephe_data_addr(e), caml_ephe_none);
+      Field(e,CAML_EPHE_DATA_OFFSET) = caml_ephe_none;
     }
   }
 }
@@ -183,7 +183,7 @@ void caml_ephe_clean (value v) {
   child = Ephe_data(v);
   if (child != caml_ephe_none) {
     if (release_data) {
-      atomic_store_relaxed(Ephe_data_addr(v), caml_ephe_none);
+      Field(v, CAML_EPHE_DATA_OFFSET) = caml_ephe_none;
     }
 #ifdef DEBUG
     else if (Is_block (child) && !Is_young (child)) {
@@ -205,38 +205,17 @@ static void clean_field (value e, mlsize_t offset)
     do_check_key_clean(e, offset);
 }
 
-Caml_inline void ephe_write_barrier (value e, mlsize_t offset, value v)
+static void do_set (value e, mlsize_t offset, value v)
 {
-  if (Is_block (v) && Is_young (v)){
-    value old = Field (e, offset);
-    if (!(Is_block (old) && Is_young (old))){
+  if (Is_block(v) && Is_young(v)) {
+    value old = Field(e, offset);
+    Field(e, offset) = v;
+    if (!(Is_block(old) && Is_young(old)))
       add_to_ephe_ref_table (&Caml_state->minor_tables->ephe_ref,
                              e, offset);
-    }
+  } else {
+    Field(e, offset) = v;
   }
-}
-
-CAMLno_tsan /* See caml_modify in memory.c for the tsan annotations on this
-               function. */
-static void ephe_modify (value e, mlsize_t offset, value val)
-{
-  volatile value *fp = &Field(e, offset);
-
-#if defined(WITH_THREAD_SANITIZER) && defined(NATIVE_CODE)
-  caml_tsan_func_entry(__builtin_return_address(0));
-#endif
-
-  ephe_write_barrier(e, offset, val);
-
-  /* See Note [MM] in memory.c */
-  atomic_thread_fence(memory_order_acquire);
-
-#if defined(WITH_THREAD_SANITIZER) && defined(NATIVE_CODE)
-  caml_tsan_write8((void *)fp);
-  caml_tsan_func_exit();
-#endif
-
-  atomic_store_release(&Op_atomic_val((value)fp)[0], val);
 }
 
 static value ephe_set_field (value e, mlsize_t offset, value el)
@@ -244,7 +223,7 @@ static value ephe_set_field (value e, mlsize_t offset, value el)
   CAMLparam2(e,el);
 
   clean_field(e, offset);
-  ephe_modify(e, offset, el);
+  do_set(e, offset, el);
   CAMLreturn(Val_unit);
 }
 
@@ -491,12 +470,12 @@ static value ephe_blit_keys (value es, mlsize_t offset_s,
   if (offset_d < offset_s) {
     for (long i = 0; i < length; i++) {
       caml_ephe_await_key(ed, offset_d + i);
-      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
+      do_set(ed, offset_d + i, Ephe_key(es, offset_s + i));
     }
   } else {
     for (long i = length - 1; i >= 0; i--) {
       caml_ephe_await_key(ed, offset_d + i);
-      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
+      do_set(ed, offset_d + i, Ephe_key(es, offset_s + i));
     }
   }
   CAMLreturn(Val_unit);
@@ -527,7 +506,7 @@ CAMLprim value caml_ephe_blit_data (value es, value ed)
   caml_ephe_clean(ed);
 
   value v = Ephe_data(es);
-  ephe_modify(ed, CAML_EPHE_DATA_OFFSET, v);
+  do_set(ed, CAML_EPHE_DATA_OFFSET, v);
   if (caml_marking_started())
     caml_darken(Caml_state, v, 0);
   /* [ed] may be in [Caml_state->ephe_info->live] list. The data value may be

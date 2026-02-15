@@ -165,10 +165,6 @@ git branch $BRANCH
 
 # update build-aux/ocaml_version.m4 with the new future branch,
 #   4.07.0+dev1-2018-06-26 => 4.08.0+dev0-2018-06-30
-# Also increment OCAML__RELEASE_NUMBER in build-aux/ocaml_version.m4
-#   If the major version number is changing, the logic in p_runtime_id in
-#   tools/objinfo.ml mapping release number to major/minor version will need
-#   altering.
 # Update ocaml-variants.opam with new version.
 tools/autogen
 # Add a "Working version" section" to Changes
@@ -414,7 +410,7 @@ Try to propagate the new compiler to external open source tools
 See https://github.com/compiler-explorer/compiler-explorer/pull/6735
 and https://github.com/compiler-explorer/infra/pull/1359 as examples.
 
-This should be expanded, once we have more experience with the process
+This should be expanded, once we have more experince with the process
 
 # Appendix
 

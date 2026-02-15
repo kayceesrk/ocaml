@@ -118,7 +118,7 @@ CAMLexport value caml_unix_getsockopt_aux(const char * name,
   CAMLparam0();
   CAMLlocal1(err);
   union option_value optval;
-  socklen_t optsize;
+  socklen_param_type optsize;
   value res;
 
   switch (ty) {
@@ -174,7 +174,7 @@ CAMLexport value caml_unix_setsockopt_aux(const char * name,
                                      value socket, value val)
 {
   union option_value optval;
-  socklen_t optsize;
+  socklen_param_type optsize;
 
   switch (ty) {
   case TYPE_BOOL:

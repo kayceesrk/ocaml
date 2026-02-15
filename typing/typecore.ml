@@ -810,16 +810,6 @@ let enter_orpat_variables loc env  p1_vs p2_vs =
           raise (Error (loc, env, err)) in
   unify_vars p1_vs p2_vs
 
-(* Create two instances with identical variables but independent structure.
-   NB: [generic_instance] can only be used if the variables of the
-   original type are not at [generic_level], but in the [cty_type] of
-   [build_as_type_extra], they are at [generic_level].
-   If we used [generic_instance] we would lose the sharing between variables
-   in the returned types. *)
-let instance_unshared ty =
-  let ty = with_local_level_generalize_structure (fun () -> instance ty) in
-  (instance ty, instance ty)
-
 let rec build_as_type (env : Env.t) p =
   build_as_type_extra env p p.pat_extra
 
@@ -839,10 +829,17 @@ and build_as_type_extra_inner env p ty rest =
       (* Otherwise we combine the inferred type for the pattern with
          then non-ground constraint in a non-ambivalent way *)
       let as_ty = build_as_type_extra env p rest in
-      let ty1, ty2 = instance_unshared ty in
+      (* [generic_instance] can only be used if the variables of the original
+         type ([cty.ctyp_type] here) are not at [generic_level], which they are
+         here.
+         If we used [generic_instance] we would lose the sharing between
+         [instance ty] and [ty].  *)
+      let ty =
+        with_local_level_generalize_structure (fun () -> instance ty)
+      in
       (* This call to unify may only fail due to missing GADT equations *)
-      unify_pat_types p.pat_loc env (instance as_ty) ty1;
-      ty2
+      unify_pat_types p.pat_loc env (instance as_ty) (instance ty);
+      ty
 
 and build_as_type_aux (env : Env.t) p =
   match p.pat_desc with
@@ -853,21 +850,13 @@ and build_as_type_aux (env : Env.t) p =
       newty (Ttuple labeled_tyl)
   | Tpat_construct(_, cstr, pl, vto) ->
       let keep =
-        cstr.cstr_private = Private ||
+        cstr.cstr_private = Private || cstr.cstr_existentials <> [] ||
         vto <> None (* be lazy and keep the type for node constraints *) in
       if keep then p.pat_type else
       let tyl = List.map (build_as_type env) pl in
       let ty_args, ty_res, _ =
-        instance_constructor Keep_existentials_flexible cstr in
-      (* [p] is a valid result of type inference, so the levels inside its
-         types are correct (higher than the scopes). [tyl] is obtained
-         from [pl], which is part of [p], so that all the locally abstract
-         types it contains come from [p].
-         [ty_args] is an instance of the constructor type such that its
-         variables, includinding existentials, are mapped to variables at
-         a level higher than any locally abstract type in [pl], hence [tyl].
-         This means that [tyl] is an instance of [ty_args],
-         and unification should not fail *)
+        instance_constructor Keep_existentials_flexible cstr
+      in
       List.iter2 (fun (p,ty) -> unify_pat env {p with pat_type = ty})
         (List.combine pl tyl) ty_args;
       ty_res
@@ -913,20 +902,8 @@ and build_as_type_aux (env : Env.t) p =
 
 (* Constraint solving during typing of patterns *)
 
-(* To avoid false-positives of the escape check for existentials,
-   we need to raise levels above the highest scope inside the pattern
-   (more-or-less the depth of the nests of or-patterns).
-   Instead of actually nesting [with_local_level_generalize],
-   we start with a high enough level, namely [generic_level - 10].
-   [build_as_type] does not nest [with_local_level_generalize],
-   hence -10 is enough.
-   We could also have used [generic_level] rather than [generic_level - 10],
-   but this requires much care inside [build_as_type], in particular
-   [instance_unshared] would have to be modified.
- *)
 let solve_Ppat_alias env pat =
-  with_local_level_generalize (fun () ->
-    with_level ~level:(generic_level - 10) (fun () -> build_as_type env pat))
+  with_local_level_generalize (fun () -> build_as_type env pat)
 
 (* Extracts the first element from a list matching a label. Roughly:
      pat <- List.assoc_opt label patl;
@@ -3163,16 +3140,12 @@ let rec is_nonexpansive exp =
      See GPR#1142 *)
   | Texp_assert (exp, _) ->
       is_nonexpansive exp
-  | Texp_apply ({ exp_desc = Texp_ident (_, _, {val_kind = Val_prim p}) },
-                args) ->
-    begin match p, args with
-    | { Primitive.prim_name = ("%raise" | "%reraise" | "%raise_notrace"
-                              | "%identity") },
-      [Nolabel, Arg e] ->
-        is_nonexpansive e
-    | _ ->
-        false
-    end
+  | Texp_apply (
+      { exp_desc = Texp_ident (_, _, {val_kind =
+             Val_prim {Primitive.prim_name =
+                         ("%raise" | "%reraise" | "%raise_notrace")}}) },
+      [Nolabel, Arg e]) ->
+     is_nonexpansive e
   | Texp_struct_item (si, e) ->
       is_nonexpansive_struct_item si && is_nonexpansive e
   | Texp_array (_, _ :: _)
@@ -3322,9 +3295,8 @@ let type_approx_fun_one_param
     | Some spat -> check_poly_constraint spat env label
   in
   let { ty_param; ty_ret } =
-    match filter_arrow env ty_expected label ~param_hole:has_poly with
-    | Ok filtered_arrow -> filtered_arrow
-    | Error err ->
+    try filter_arrow env ty_expected label ~param_hole:has_poly
+    with Filter_arrow_failed err ->
       let loc_fun, ty_fun = in_function in
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
@@ -3667,32 +3639,6 @@ let contains_gadt p =
      match p.pat_desc with
      | Tpat_construct (_, cd, _, _) when cd.cstr_generalized -> true
      | _ -> false } p
-
-
-(* When typing [let rec p = e ...], we require [p] to be "variable-like":
-   it must consists of a single variable [x], optionally wrapped in
-   erasable pattern constructs (e.g. annotations, local opens) *)
-let rec is_var_pat p =
-  match p.ppat_desc with
-  | Ppat_var _ -> true
-  | Ppat_constraint (p, _)
-  | Ppat_open (_, p) -> is_var_pat p
-  | Ppat_any
-  | Ppat_alias _
-  | Ppat_constant _
-  | Ppat_interval _
-  | Ppat_tuple _
-  | Ppat_construct _
-  | Ppat_variant _
-  | Ppat_record _
-  | Ppat_array _
-  | Ppat_or _
-  | Ppat_type _
-  | Ppat_lazy _
-  | Ppat_unpack _
-  | Ppat_exception _
-  | Ppat_effect _
-  | Ppat_extension _  -> false
 
 (* There are various things that we need to do in presence of GADT constructors
    that aren't required if there are none.
@@ -4112,8 +4058,8 @@ and type_expect_
           (* Assert that [ty] is a function, and return its return type. *)
           let filter_ty_ret_exn ty arg_label ~param_hole =
             match filter_arrow env ty arg_label ~param_hole with
-            | Ok { ty_ret; _ } -> ty_ret
-            | Error error ->
+            | { ty_ret; _ } -> ty_ret
+            | exception (Filter_arrow_failed error) ->
                 let trace =
                   match error with
                   | Unification_error trace -> trace
@@ -5283,15 +5229,12 @@ and split_function_ty env ty_expected ~arg_label ~has_poly ~first ~in_function =
     with_local_level_generalize_structure_if separate begin fun () ->
       (* If [has_poly] is true then we rely on the later call to type_pat to
          enforce the invariant that the parameter type be a [Tpoly] node *)
-      match
-        filter_arrow env (instance ty_expected) arg_label ~param_hole:has_poly
-      with
-      | Ok filtered_arrow -> filtered_arrow
-      | Error err ->
-        let err =
-          error_of_filter_arrow_failure ~explanation ty_fun err ~first
-        in
-          raise (Error(loc, env, err))
+      try filter_arrow env (instance ty_expected) arg_label ~param_hole:has_poly
+      with Filter_arrow_failed err ->
+      let err =
+        error_of_filter_arrow_failure ~explanation ty_fun err ~first
+      in
+        raise (Error(loc, env, err))
     end
   in
   if !Clflags.principal
@@ -6038,8 +5981,8 @@ and type_application env app_loc funct sargs =
   let exception Filter_arrow_mono_failed in
   let filter_arrow_mono env t l =
     match filter_arrow env t l ~param_hole:false with
-    | Error _ -> raise Filter_arrow_mono_failed
-    | Ok ({ty_param; _} as farr)  ->
+    | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
+    | {ty_param; _} as farr  ->
         match tpoly_get_mono_opt ty_param with
         | None -> raise Filter_arrow_mono_failed
         | Some ty_param -> { farr with ty_param }
@@ -6604,12 +6547,7 @@ and type_let ?check ?check_strict
   let spatl =  List.map vb_pat_constraint spat_sexp_list in
   let attrs_list = List.map fst spatl in
   let is_recursive = (rec_flag = Recursive) in
-  if is_recursive then
-    List.iter
-      (fun { pvb_pat = pat; _ } ->
-        if not (is_var_pat pat)
-        then raise (Error (pat.ppat_loc, env, Illegal_letrec_pat)))
-      spat_sexp_list;
+
   let (pat_list, exp_list, new_env, mvs) =
     with_local_level_generalize begin fun () ->
       if existential_context = At_toplevel then Typetexp.TyVarEnv.reset ();
@@ -6733,6 +6671,13 @@ and type_let ?check ?check_strict
         })
       l spat_sexp_list
   in
+  if is_recursive then
+    List.iter
+      (fun {vb_pat=pat} -> match pat.pat_desc with
+           Tpat_var _ -> ()
+         | Tpat_alias ({pat_desc=Tpat_any}, _, _, _, _) -> ()
+         | _ -> raise(Error(pat.pat_loc, env, Illegal_letrec_pat)))
+      l;
   List.iter (fun vb ->
       if pattern_needs_partial_application_check vb.vb_pat then
         check_partial_application ~statement:false vb.vb_expr

@@ -2,7 +2,6 @@
  include unix;
  include runtime_events;
  hasunix;
- not-root;
  {
    bytecode;
  }{
@@ -34,7 +33,6 @@ let find_events_pid cursor =
 
 (* force failure of [create_cursor None] *)
 let make_unreadable () =
-  (* NOTE: Only works if the current user isn't root *)
   Unix.chmod (Option.get (Runtime_events.path())) 0o000
 
 let () =

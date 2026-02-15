@@ -53,23 +53,22 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
                              value flags)
 {
   CAMLparam1(buff);
-  CAMLlocal1(vaddr);
+  CAMLlocal1(adr);
   SOCKET s = Socket_val(sock);
   int flg = caml_convert_flag_list(flags, msg_flag_table);
   int ret;
   intnat numbytes;
   char iobuf[UNIX_BUFFER_SIZE];
   value res;
-  struct sockaddr_storage addr;
-  socklen_t addr_len;
+  union sock_addr_union addr;
+  socklen_param_type addr_len;
   DWORD err = 0;
 
   numbytes = Long_val(len);
   if (numbytes > UNIX_BUFFER_SIZE) numbytes = UNIX_BUFFER_SIZE;
   addr_len = sizeof(addr);
   caml_enter_blocking_section();
-  ret = recvfrom(s, iobuf, (int) numbytes, flg,
-                 (struct sockaddr *) &addr, &addr_len);
+  ret = recvfrom(s, iobuf, (int) numbytes, flg, &addr.s_gen, &addr_len);
   if (ret == -1) err = WSAGetLastError();
   caml_leave_blocking_section();
   if (ret == -1) {
@@ -77,10 +76,10 @@ CAMLprim value caml_unix_recvfrom(value sock, value buff, value ofs, value len,
     caml_uerror("recvfrom", Nothing);
   }
   memmove (&Byte(buff, Long_val(ofs)), iobuf, ret);
-  vaddr = caml_unix_alloc_sockaddr((struct sockaddr *) &addr, addr_len, -1);
+  adr = caml_unix_alloc_sockaddr(&addr, addr_len, -1);
   res = caml_alloc_small(2, 0);
   Field(res, 0) = Val_int(ret);
-  Field(res, 1) = vaddr;
+  Field(res, 1) = adr;
   CAMLreturn(res);
 }
 
@@ -116,8 +115,8 @@ value caml_unix_sendto_native(value sock, value buff, value ofs, value len,
   int ret;
   intnat numbytes;
   char iobuf[UNIX_BUFFER_SIZE];
-  struct sockaddr_storage addr;
-  socklen_t addr_len;
+  union sock_addr_union addr;
+  socklen_param_type addr_len;
   DWORD err = 0;
 
   caml_unix_get_sockaddr(dest, &addr, &addr_len);
@@ -125,8 +124,7 @@ value caml_unix_sendto_native(value sock, value buff, value ofs, value len,
   if (numbytes > UNIX_BUFFER_SIZE) numbytes = UNIX_BUFFER_SIZE;
   memmove (iobuf, &Byte(buff, Long_val(ofs)), numbytes);
   caml_enter_blocking_section();
-  ret = sendto(s, iobuf, (int) numbytes, flg,
-               (struct sockaddr *) &addr, addr_len);
+  ret = sendto(s, iobuf, (int) numbytes, flg, &addr.s_gen, addr_len);
   if (ret == -1) err = WSAGetLastError();
   caml_leave_blocking_section();
   if (ret == -1) {

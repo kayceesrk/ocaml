@@ -62,7 +62,7 @@ let main argv ppf =
             "Please specify at most one of -pack, -a, -c, -output-obj";
       | Some ((P.Parsing | P.Typing | P.Lambda) as p) ->
         assert (P.is_compilation_pass p);
-        Compenv.fatalf
+        Printf.ksprintf Compenv.fatal
           "Options -i and -stop-after (%s) \
            are  incompatible with -pack, -a, -output-obj"
           (String.concat "|"

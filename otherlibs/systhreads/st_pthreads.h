@@ -22,7 +22,9 @@
 #include <pthread.h>
 #include <signal.h>
 #include <time.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 
 typedef pthread_t st_thread_id;
@@ -42,6 +44,8 @@ static int st_thread_create(st_thread_id * res,
   if (res != NULL) *res = thr;
   return rc;
 }
+
+#define ST_THREAD_FUNCTION void *
 
 /* Thread termination */
 
@@ -103,16 +107,6 @@ static int st_masterlock_init(st_masterlock * m)
   pthread_mutex_destroy(&m->lock);
  out_err:
   return rc;
-}
-
-static void st_masterlock_destroy(st_masterlock * m)
-{
-  int rc;
-  rc = pthread_cond_destroy(&m->is_free);
-  CAMLassert(!rc);
-  rc = pthread_mutex_destroy(&m->lock);
-  CAMLassert(!rc);
-  (void)rc;
 }
 
 static uintnat st_masterlock_waiters(st_masterlock * m)

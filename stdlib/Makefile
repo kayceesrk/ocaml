@@ -14,17 +14,12 @@
 #**************************************************************************
 
 ROOTDIR = ..
-SUBDIR_NAME = stdlib
 # NOTE: it is important that the OCAMLDEP variable is defined *before*
 # Makefile.common gets included, so that its local definition here
 # take precedence over its general shared definitions in Makefile.common.
 OCAMLDEP ?= $(BOOT_OCAMLDEP)
 
 include $(ROOTDIR)/Makefile.common
-
-%.$(O): %.c $(REQUIRED_HEADERS)
-	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
-	  $(OUTPUTOBJ)$@ -c $<
 
 # There are three ways the Standard Library is compiled in bytecode:
 # 1. During coldstart
@@ -52,9 +47,6 @@ endif
 OPTCOMPILER=$(ROOTDIR)/ocamlopt$(EXE)
 CAMLOPT=$(OCAMLRUN) $(OPTCOMPILER)
 
-# At present, only META is installed to the package directory
-LIBNAME = stdlib
-
 include StdlibModules
 
 OBJS=$(addsuffix .cmo,$(STDLIB_MODULES))
@@ -62,32 +54,38 @@ NOSTDLIB= camlinternalFormatBasics.cmo stdlib.cmo
 OTHERS=$(filter-out $(NOSTDLIB),$(OBJS))
 
 .PHONY: all
-all: stdlib.cma std_exit.cmo $(HEADER_NAME)
+all: stdlib.cma std_exit.cmo $(HEADER_NAME) target_$(HEADER_NAME)
 
 .PHONY: allopt opt.opt # allopt and opt.opt are synonyms
 allopt: stdlib.cmxa std_exit.cmx
 opt.opt: allopt
 
+INSTALL_STDLIB_META_DIR=$(DESTDIR)$(LIBDIR)/stdlib
+
 .PHONY: install
 install::
-	$(call INSTALL_ITEMS, stdlib.cma std_exit.cmo *.cmi, lib)
-	$(call INSTALL_ITEMS, META, lib, $(LIBNAME))
+	$(INSTALL_DATA) \
+	  stdlib.cma std_exit.cmo *.cmi "$(INSTALL_LIBDIR)"
+	$(MKDIR) "$(INSTALL_STDLIB_META_DIR)"
+	$(INSTALL_DATA) META "$(INSTALL_STDLIB_META_DIR)"
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
-	$(call INSTALL_ITEMS, *.cmt *.cmti *.mli *.ml *.ml.in, lib)
+	$(INSTALL_DATA) \
+	  *.cmt *.cmti *.mli *.ml *.ml.in \
+	  "$(INSTALL_LIBDIR)"
 endif
-	$(call INSTALL_ITEMS, $(HEADER_NAME), lib)
+	$(INSTALL_DATA) target_$(HEADER_NAME) "$(INSTALL_LIBDIR)/$(HEADER_NAME)"
 
 .PHONY: installopt
 installopt: installopt-default
 
 .PHONY: installopt-default
 installopt-default:
-	$(call INSTALL_ITEMS, stdlib.cmxa stdlib.$(A) std_exit.$(O) *.cmx, lib)
+	$(INSTALL_DATA) \
+	  stdlib.cmxa stdlib.$(A) std_exit.$(O) *.cmx \
+	  "$(INSTALL_LIBDIR)"
 
-MANGLING = $(filter true,$(SUFFIXING))
-runtime-launch-info: tmpheader.exe
-	@{ printf '$(if $(MANGLING),$(ZINC_RUNTIME_ID_HI),\000)'; \
-	   cat $^; } > $@
+%-launch-info: %.info tmpheader.exe
+	@cat $^ > $@
 
 # The mingw-w64 and MSVC versions of tmpheader.exe are linked with special flags
 # to reduce their size (considerably). In particular, the entry point is
@@ -137,11 +135,11 @@ stdlib.cmxa: $(OBJS:.cmo=.cmx)
 
 .PHONY: distclean
 distclean: clean
-	rm -f sys.ml META
+	rm -f sys.ml META runtime.info target_runtime.info
 
 .PHONY: clean
 clean::
-	rm -f $(HEADER_NAME)
+	rm -f $(HEADER_NAME) target_$(HEADER_NAME)
 
 export AWK
 
@@ -188,7 +186,6 @@ $(OTHERS:.cmo=.cmx) std_exit.cmx: stdlib.cmx
 clean::
 	rm -f *.cm* *.o *.obj *.a *.lib *.odoc
 
-.PHONY: .depend
 include .depend
 
 STDLIB_NAMESPACE_MODULES = $(subst $(SPACE),|,$(STDLIB_PREFIXED_MODULES))

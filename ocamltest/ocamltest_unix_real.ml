@@ -15,7 +15,6 @@
 (* Unix.gettimeofday and Unix.has_symlink never raise *)
 let has_symlink = Unix.has_symlink
 let gettimeofday = Unix.gettimeofday
-let getuid = Unix.getuid
 
 (* Convert Unix_error to Sys_error *)
 let wrap f x =

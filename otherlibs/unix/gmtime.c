@@ -21,7 +21,7 @@
 #include <time.h>
 #include <errno.h>
 
-static value alloc_tm(const struct tm *tm)
+static value alloc_tm(struct tm *tm)
 {
   value res;
   res = caml_alloc_small(9, 0);
@@ -39,29 +39,21 @@ static value alloc_tm(const struct tm *tm)
 
 CAMLprim value caml_unix_gmtime(value t)
 {
-  time_t clock = (time_t) Double_val(t);
+  time_t clock;
   struct tm * tm;
-#ifdef HAVE_GMTIME_R
-  struct tm result;
-  tm = gmtime_r(&clock, &result);
-#else
+  clock = (time_t) Double_val(t);
   tm = gmtime(&clock);
-#endif
-  if (tm == NULL) caml_uerror("gmtime", Nothing);
+  if (tm == NULL) caml_unix_error(EINVAL, "gmtime", Nothing);
   return alloc_tm(tm);
 }
 
 CAMLprim value caml_unix_localtime(value t)
 {
-  time_t clock = (time_t) Double_val(t);
+  time_t clock;
   struct tm * tm;
-#ifdef HAVE_LOCALTIME_R
-  struct tm result;
-  tm = localtime_r(&clock, &result);
-#else
+  clock = (time_t) Double_val(t);
   tm = localtime(&clock);
-#endif
-  if (tm == NULL) caml_uerror("localtime", Nothing);
+  if (tm == NULL) caml_unix_error(EINVAL, "localtime", Nothing);
   return alloc_tm(tm);
 }
 
@@ -81,11 +73,11 @@ CAMLprim value caml_unix_mktime(value t)
   tm.tm_mday = Int_val(Field(t, 3));
   tm.tm_mon = Int_val(Field(t, 4));
   tm.tm_year = Int_val(Field(t, 5));
-  tm.tm_isdst = -1;
-  tm.tm_wday = -1;
+  tm.tm_wday = Int_val(Field(t, 6));
+  tm.tm_yday = Int_val(Field(t, 7));
+  tm.tm_isdst = -1; /* tm.tm_isdst = Bool_val(Field(t, 8)); */
   clock = mktime(&tm);
-  if (clock == (time_t) -1 && tm.tm_wday == -1)
-    caml_uerror("mktime", Nothing);
+  if (clock == (time_t) -1) caml_unix_error(ERANGE, "mktime", Nothing);
   tmval = alloc_tm(&tm);
   clkval = caml_copy_double((double) clock);
   res = caml_alloc_small(2, 0);

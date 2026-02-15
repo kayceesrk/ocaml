@@ -17,6 +17,4 @@
  (modes byte)
  (flags (:standard -nostdlib))
  (libraries stdlib)
- (foreign_stubs
-  (language c)
-  (names strstubs)))
+ (c_names strstubs))

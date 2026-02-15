@@ -82,18 +82,7 @@ val increase_global_level: unit -> int
 val restore_global_level: int -> unit
         (* This pair of functions is only used in Typetexp *)
 
-val create_scope: unit -> int
-        (* Return a level higher than all previous levels.
-           When used as scope in [Ident.create_scoped], this guarantees
-           that the correspondind type cannot escape to a previous
-           environment.
-           Practically, this is done by returning the current level
-           after raising it.
-           Contrary to [with_local_level*], the end of the scope is not
-           specified by [create_scope]. If there is an enclosing
-           [with_local_level*], the scope will end there. Otherwise
-           the scope continues until the end of the compilation unit
-           or toplevel session. *)
+val create_scope : unit -> int
 
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
@@ -308,17 +297,8 @@ type filtered_arrow =
     ty_ret : type_expr;
   }
 
-type filter_arrow_failure =
-  | Unification_error of Errortrace.unification_error
-  | Label_mismatch of
-      { got           : arg_label
-      ; expected      : arg_label
-      ; expected_type : type_expr
-      }
-  | Not_a_function
-
 val filter_arrow: Env.t -> type_expr -> arg_label -> param_hole:bool ->
-        (filtered_arrow, filter_arrow_failure) result
+        filtered_arrow
         (* A special case of unification with [l:'a -> 'b]. If [param_hole] is
            true then ['a] might be initialized with a [Tvar _] hole to be filled
            later by a [Tpoly _].
@@ -349,6 +329,17 @@ val reify_univars : Env.t -> Types.type_expr -> Types.type_expr
         (* Replaces all the variables of a type by a univar. *)
 
 (* Exceptions for special cases of unify *)
+
+type filter_arrow_failure =
+  | Unification_error of Errortrace.unification_error
+  | Label_mismatch of
+      { got           : arg_label
+      ; expected      : arg_label
+      ; expected_type : type_expr
+      }
+  | Not_a_function
+
+exception Filter_arrow_failed of filter_arrow_failure
 
 type filter_method_failure =
   | Unification_error of Errortrace.unification_error

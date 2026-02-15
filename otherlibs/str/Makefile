@@ -28,5 +28,4 @@ str.cmx: str.cmi
 depend:
 	$(OCAMLRUN) $(ROOTDIR)/boot/ocamlc -depend -slash *.mli *.ml > .depend
 
-.PHONY: .depend
 include .depend

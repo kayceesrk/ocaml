@@ -65,7 +65,7 @@
   #define __USE_MINGW_ANSI_STDIO 0
 #endif
 
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) && !__USE_MINGW_ANSI_STDIO && !defined(_UCRT)
 #define ARCH_SIZET_PRINTF_FORMAT "I"
 #else
 #define ARCH_SIZET_PRINTF_FORMAT "z"
@@ -160,7 +160,7 @@ typedef uintptr_t uintnat;
 
 /* The size of a page for memory management (in bytes) is [1 << Page_log].
    [Page_size] must be a multiple of [sizeof (value)].
-   [Page_log] must be >= 8 and <= 20.
+   [Page_log] must be be >= 8 and <= 20.
    Do not change the definition of [Page_size]. */
 #define Page_log 12             /* A page is 4 kilobytes. */
 #define Page_size (1 << Page_log)

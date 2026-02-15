@@ -723,8 +723,7 @@ Error: Signature mismatch:
                $S2 = sig type yb end
              does not include
                $T2 = sig type ybb end
-             The type "yb" is required but not provided.
-             Hint:    "ybb" is a close match.
+             The type "yb" is required but not provided
        3. Module types do not match:
             $S3 = (A : sig type za end) (B : sig type zbb end) -> sig end
           does not include
@@ -866,8 +865,7 @@ Error: Signature mismatch:
                $S1 = sig type xa end
              does not include
                $T1 = sig type xaa end
-             The type "xa" is required but not provided.
-             Hint:    "xaa" is a close match.
+             The type "xa" is required but not provided
           2. Module types $S2 and $T2 match
        2. Module types do not match:
             $S2 = (A : sig type ya end) (B : sig type ybb end) -> sig end
@@ -1023,8 +1021,7 @@ Error: Signature mismatch:
             $S2 = sig type y' end
           does not include
             $T2 = sig type y end
-          The type "y'" is required but not provided.
-          Hint:    "y" is a close match.
+          The type "y'" is required but not provided
        3. An argument appears to be missing with module type
               $T3 = sig type z end
        4. Module types $S4 and $T4 match
@@ -1149,8 +1146,7 @@ Error: Signature mismatch:
               type meet
               type again
             end
-          The type "tree" is required but not provided.
-          Hint:    "three" is a close match.
+          The type "tree" is required but not provided
        2. Module types do not match:
             $S2 =
             sig type in_ val thunder : in_ val lightning : in_ type pain end
@@ -1765,7 +1761,7 @@ module F
      end) =
 struct end
 
-(** The definition of `F` and its application below disagree on
+(** The definition of `F` and its application belows disagree on
     the arity of `t`, we should not equate the two types *)
 
 include
@@ -1899,7 +1895,7 @@ Error: This application of the functor "With_expansion" is ill-typed.
 |}]
 
 
-(** The definition of `H` and its application below still disagree on
+(** The definition of `H` and its application belows still disagree on
     the arity of `t`. However, they agree on the type constructor s.
     Currently, we don't add an equality X.s = G($1).s, but we may want
     to do so in the future. *)
@@ -2151,108 +2147,4 @@ Error: Signature mismatch:
        This module should not be a functor, a structure was expected.
        Moreover, the type of the functor body is incompatible with the
        expected module type.
-|}]
-
-(** Keeping equations *)
-
-module M: sig
-  type t
-  module Inner: sig type t end
-  module F(X:sig val f: t val g: Inner.t val h:float end):sig end
-end = struct
-  type t
-  module Inner= struct type t end
-  module F(X:sig val f: t val g: Inner.t val h:int end)= struct end
-end
-[%%expect {|
-Lines 7-11, characters 6-3:
- 7 | ......struct
- 8 |   type t
- 9 |   module Inner= struct type t end
-10 |   module F(X:sig val f: t val g: Inner.t val h:int end)= struct end
-11 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             (X : sig val f : t val g : Inner.t val h : int end) -> sig end
-         end
-       is not included in
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             (X : sig val f : t val g : Inner.t val h : float end) -> sig end
-         end
-       In module "F":
-       Modules do not match:
-         (X : $S1) -> ...
-       is not included in
-         (X : $T1) -> ...
-       Module types do not match:
-         $S1 = sig val f : t val g : Inner.t val h : int end
-       does not include
-         $T1 = sig val f : t val g : Inner.t val h : float end
-       Values do not match: val h : float is not included in val h : int
-       The type "float" is not compatible with the type "int"
-|}]
-
-module M: sig
-  type t
-  module Inner: sig type t end
-  module F
-      (A:a)
-      (X:sig val f: t val h:int end)
-      (A:a)
-      (Y:sig val f: Inner.t val h:int end)
-
- :sig end
-end = struct
-  type t
-  module Inner= struct type t end
-  module F
-      (X:sig val f: t val h:int end)
-      (A:a)
-      (Y:sig val f: Inner.t val h:int end)
-  = struct end
-end
-[%%expect {|
-Lines 11-19, characters 6-3:
-11 | ......struct
-12 |   type t
-13 |   module Inner= struct type t end
-14 |   module F
-15 |       (X:sig val f: t val h:int end)
-16 |       (A:a)
-17 |       (Y:sig val f: Inner.t val h:int end)
-18 |   = struct end
-19 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             (X : sig val f : t val h : int end) (A : a)
-             (Y : sig val f : Inner.t val h : int end) -> sig end
-         end
-       is not included in
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             (A : a) (X : sig val f : t val h : int end) (A : a)
-             (Y : sig val f : Inner.t val h : int end) -> sig end
-         end
-       In module "F":
-       Modules do not match:
-         (X : $S2) (A : a) (Y : $S4) -> ...
-       is not included in
-         (A : a) (X : $T2) (A : a) (Y : $T4) -> ...
-       1. An argument appears to be missing with module type a
-       2. Module types $S2 and $T2 match
-       3. Module types a and a match
-       4. Module types $S4 and $T4 match
 |}]

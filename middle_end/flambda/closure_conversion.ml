@@ -109,19 +109,25 @@ let register_const t (constant:Flambda.constant_defining_value) name
 let rec declare_const t (const : Lambda.structured_constant)
     : Flambda.constant_defining_value_block_field * Internal_variable_names.t =
   match const with
-  | Const_int c -> (Const (Int c), Names.const_int)
-  | Const_char c -> (Const (Char c), Names.const_char)
-  | Const_float c ->
+  | Const_base (Const_int c) -> (Const (Int c), Names.const_int)
+  | Const_base (Const_char c) -> (Const (Char c), Names.const_char)
+  | Const_base (Const_string (s, _, _)) ->
+    let const, name =
+      (Flambda.Allocated_const (Immutable_string s),
+       Names.const_immstring)
+    in
+    register_const t const name
+  | Const_base (Const_float c) ->
     register_const t
       (Allocated_const (Float (float_of_string c)))
       Names.const_float
-  | Const_int32 c ->
+  | Const_base (Const_int32 c) ->
     register_const t (Allocated_const (Int32 c))
       Names.const_int32
-  | Const_int64 c ->
+  | Const_base (Const_int64 c) ->
     register_const t (Allocated_const (Int64 c))
       Names.const_int64
-  | Const_nativeint c ->
+  | Const_base (Const_nativeint c) ->
     register_const t (Allocated_const (Nativeint c)) Names.const_nativeint
   | Const_immstring c ->
     register_const t (Allocated_const (Immutable_string c))
@@ -152,7 +158,7 @@ let lambda_const_bool b : Lambda.structured_constant =
     Lambda.const_int 0
 
 let lambda_const_int i : Lambda.structured_constant =
-  Lambda.const_int i
+  Const_base (Const_int i)
 
 let rec close t env (lam : Lambda.lambda) : Flambda.t =
   match lam with
@@ -384,30 +390,26 @@ let rec close t env (lam : Lambda.lambda) : Flambda.t =
         ~name:Names.raise)
   | Lprim (Pctconst c, [arg], _loc) ->
       let module Backend = (val t.backend) in
-      let cst f v =
-        let const = f v in
-        close t env (Lambda.Llet(Strict, Pgenval, Ident.create_local "dummy",
-                     arg, Lconst const))
+      let const =
+        begin match c with
+        | Big_endian -> lambda_const_bool Backend.big_endian
+        | Word_size -> lambda_const_int (8*Backend.size_int)
+        | Int_size -> lambda_const_int (8*Backend.size_int - 1)
+        | Max_wosize ->
+            lambda_const_int ((1 lsl ((8*Backend.size_int) - 10)) - 1)
+        | Ostype_unix ->
+            lambda_const_bool (String.equal Config.target_os_type "Unix")
+        | Ostype_win32 ->
+            lambda_const_bool (String.equal Config.target_os_type "Win32")
+        | Ostype_cygwin ->
+            lambda_const_bool (String.equal Config.target_os_type "Cygwin")
+        | Backend_type ->
+            Lambda.const_int 0 (* tag 0 is the same as Native *)
+        end
       in
-      begin match c with
-      | Big_endian -> cst lambda_const_bool Backend.big_endian
-      | Word_size -> cst lambda_const_int (8*Backend.size_int)
-      | Int_size -> cst lambda_const_int (8*Backend.size_int - 1)
-      | Max_wosize ->
-          cst lambda_const_int ((1 lsl ((8*Backend.size_int) - 10)) - 1)
-      | Ostype_unix ->
-          cst lambda_const_bool (String.equal Config.target_os_type "Unix")
-      | Ostype_win32 ->
-          cst lambda_const_bool (String.equal Config.target_os_type "Win32")
-      | Ostype_cygwin ->
-          cst lambda_const_bool (String.equal Config.target_os_type "Cygwin")
-      | Backend_type -> cst Lambda.const_int 0 (* tag 0 is the same as Native *)
-      | Standard_library_default ->
-          Compilenv.need_stdlib_location ();
-          let symbol = t.symbol_for_global' Compilenv.stdlib_symbol_name in
-          t.imported_symbols <- Symbol.Set.add symbol t.imported_symbols;
-          name_expr (Symbol symbol) ~name:Names.pgetglobal
-      end
+      close t env
+        (Lambda.Llet(Strict, Pgenval, Ident.create_local "dummy",
+                     arg, Lconst const))
   | Lprim (Pfield _, [Lprim (Pgetglobal id, [],_)], _)
       when Ident.same id t.current_unit_id ->
     Misc.fatal_errorf "[Pfield (Pgetglobal ...)] for the current compilation \

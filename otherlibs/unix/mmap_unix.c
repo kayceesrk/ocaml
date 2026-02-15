@@ -29,7 +29,9 @@
 #include "caml/unixsupport.h"
 
 #include <errno.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #ifdef HAS_MMAP
 #include <sys/types.h>
 #include <sys/mman.h>

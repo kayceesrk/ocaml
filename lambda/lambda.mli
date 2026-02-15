@@ -26,7 +26,6 @@ type compile_time_constant =
   | Ostype_win32
   | Ostype_cygwin
   | Backend_type
-  | Standard_library_default
 
 type immediate_or_pointer =
   | Immediate
@@ -215,12 +214,7 @@ val equal_value_kind : value_kind -> value_kind -> bool
 val equal_boxed_integer : boxed_integer -> boxed_integer -> bool
 
 type structured_constant =
-    Const_int of int
-  | Const_char of char
-  | Const_float of string
-  | Const_int32 of int32
-  | Const_int64 of int64
-  | Const_nativeint of nativeint
+    Const_base of constant
   | Const_block of int * structured_constant list
   | Const_float_array of string list
   | Const_immstring of string
@@ -391,8 +385,6 @@ val make_key: lambda -> lambda option
 val const_unit: structured_constant
 val const_int : int -> structured_constant
 val lambda_unit: lambda
-
-val lambda_of_const : Asttypes.constant -> lambda
 
 (** [dummy_constant] produces a plecholder value with a recognizable
     bit pattern (currently 0xBBBB in its tagged form) *)

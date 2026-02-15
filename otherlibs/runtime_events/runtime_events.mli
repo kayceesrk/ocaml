@@ -47,7 +47,7 @@
 *)
 
 (** The type for counter events emitted by the runtime. Counter events are used
-  to measure a quantity at a point in time or record the occurrence of an event.
+  to measure a quantity at a point in time or record the occurence of an event.
   In the latter case their value will be one. *)
 type runtime_counter =
 | EV_C_FORCE_MINOR_ALLOC_SMALL
@@ -531,20 +531,13 @@ type cursor
 
 module Timestamp : sig
     type t
-    (** Abstract timestamp included in events. *)
+    (** Type for the int64 timestamp to allow for future changes. *)
 
     val to_int64 : t -> int64
-    (** Convert a timestamp to a number of nanosecond.
-
-        Note that the starting point for timestamps in unspecified: the absolute
-        value is meaningless, only differences matter.
-
-        Also note that the precision of the underlying clock may be coarser than
-        nanoseconds: events may have equal timestamp if they are emitted within
-        the coarseness of the clock. *)
 
     val get_current : unit -> t
-    (** Access the current timestamp.
+    (** Access the current timestamp. The timestamp is incremented by one
+        every nanosecond, but the starting point is unspecified.
         @since 5.4 *)
 end
 

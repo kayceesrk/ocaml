@@ -574,7 +574,6 @@ and ('lbl, 'cstr) type_kind =
 and type_origin =
     Definition
   | Rec_check_regularity       (* See Typedecl.transl_type_decl *)
-  | Approx_recmod
   | Existential of string
 
 and record_representation =
@@ -727,8 +726,6 @@ val item_visibility : signature_item -> visibility
 val bound_value_identifiers: signature -> Ident.t list
 
 val signature_item_id : signature_item -> Ident.t
-val classify_signature_item:
-  signature_item -> Shape.Sig_component_kind.t * Ident.t * Location.t
 
 (**** Utilities for backtracking ****)
 

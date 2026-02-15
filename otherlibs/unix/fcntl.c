@@ -16,7 +16,9 @@
 #include <caml/fail.h>
 #include <caml/mlvalues.h>
 #include "caml/unixsupport.h"
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <fcntl.h>
 
 #ifndef O_NONBLOCK

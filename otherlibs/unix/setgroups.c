@@ -21,7 +21,9 @@
 #ifdef HAS_SETGROUPS
 
 #include <sys/types.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <limits.h>
 #include <grp.h>
 #include "caml/unixsupport.h"

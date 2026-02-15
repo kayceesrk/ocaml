@@ -17,9 +17,6 @@ let count_channel in_channel =
     match c with
       '\n' ->
         incr lines; count Outside_word
-    | '\r' ->
-        (* Ignore \r to cater for CRLF vs LF checkouts *)
-        decr chars; count Outside_word
     | ' ' | '\t' ->
         count Outside_word
     | _ ->
@@ -32,7 +29,7 @@ let count_channel in_channel =
       ()
 
 let count_file name =
-  let ic = open_in_bin name in
+  let ic = open_in name in
   count_channel ic;
   close_in ic
 

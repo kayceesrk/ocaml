@@ -1544,20 +1544,7 @@ structure_item:
     let_bindings(ext)
       { val_of_let_bindings ~loc:$sloc $1 }
   | wrap_mkstr_ext(
-      include_statement(module_expr)
-        { pstr_include $1 }
-    )
-    { $1 }
-  | local_structure_item
-    { $1 }
-;
-
-(* A local structure item (= can appear in let expressions) *)
-local_structure_item:
-  | wrap_mkstr_ext(
-      item_extension post_item_attributes
-        { pstr_extension $1 (add_docs_attrs (symbol_docs $sloc) $2) }
-    | floating_attribute
+      floating_attribute
         { pstr_attribute $1 }
     | primitive_declaration
         { pstr_primitive $1 }
@@ -1577,6 +1564,19 @@ local_structure_item:
         { pstr_class $1 }
     | class_type_declarations
         { pstr_class_type $1 }
+    | include_statement(module_expr)
+        { pstr_include $1 }
+    )
+    { $1 }
+  | local_structure_item
+    { $1 }
+;
+
+(* A local structure item (= can appear in let expressions) *)
+local_structure_item:
+  | wrap_mkstr_ext(
+      item_extension post_item_attributes
+        { pstr_extension $1 (add_docs_attrs (symbol_docs $sloc) $2) }
     | sig_exception_declaration
         { pstr_exception $1 }
     | module_binding
@@ -3706,7 +3706,7 @@ function_type:
         { Ptyp_arrow(label, domain, codomain) }
     )
     { $1 }
-  (* The next two cases are for labeled tuples - see comment on [tuple_type]
+  (* The next two cases are for labled tuples - see comment on [tuple_type]
      below.
 
      The first case is present just to resolve a shift/reduce conflict in a
@@ -3759,7 +3759,7 @@ function_type:
    label is not parsed as a proper_tuple_type, but rather as a case of
    function_type above.  This resolves ambiguities around [x:t1 * t2 -> t3]
    which must continue to parse as a function with one labeled argument even in
-   the presence of labeled tuples.
+   the presence of labled tuples.
 *)
 tuple_type:
   | ty = atomic_type

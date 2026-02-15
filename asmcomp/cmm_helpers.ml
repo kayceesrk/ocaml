@@ -1443,7 +1443,7 @@ let int_comp_caml cmp arg1 arg2 dbg =
 
 type switch_arg = Tagged of expression | Untagged of expression
 
-(** This function takes a switch on immediate values,
+(** This function takes a switch on immedate values,
     for example:
       int 0: 1
       int 1: 3
@@ -2659,9 +2659,6 @@ let predef_exception i name =
     emit_block (exn_sym, Global) (block_header tag size) fields
   in
   Cdata data_items
-
-let emit_global_string_constant name value =
-  Cdata (emit_string_constant (name, Global) value [])
 
 (* Header for a plugin *)
 

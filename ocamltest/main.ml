@@ -224,7 +224,6 @@ let test_file test_filename =
   let hookname_prefix = Filename.concat test_source_directory test_prefix in
   let test_build_directory_prefix =
     get_test_build_directory_prefix test_directory in
-  Filename.set_temp_dir_name test_build_directory_prefix;
   let clean_test_build_directory () =
     try
       Sys.rm_rf test_build_directory_prefix
@@ -289,13 +288,12 @@ let test_file test_filename =
          loop rootenv rootenv_statements
        in
        let rootenv = Environments.initialize Environments.Post log rootenv in
-       let common_prefix = " ... testing '" ^ test_basename ^ "'" in
-       Printf.printf "%s%!" common_prefix;
        let summary =
          run_test_tree log add_msg initial_status rootenv initial_summary
            tsl_ast
        in
-       Printf.printf " => %s%s\n%!" (string_of_summary summary)
+       let common_prefix = " ... testing '" ^ test_basename ^ "'" in
+       Printf.printf "%s => %s%s\n%!" common_prefix (string_of_summary summary)
          (if Options.show_timings && summary = Pass then
             let wall_clock_duration = Unix.gettimeofday () -. start in
             Printf.sprintf " (wall clock: %.02fs)" wall_clock_duration

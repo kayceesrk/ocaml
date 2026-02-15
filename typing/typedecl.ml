@@ -1890,13 +1890,13 @@ let transl_package_constraint ~loc env ty =
 
 (* Approximate a type declaration: just make all types abstract *)
 
-let abstract_type_decl ~injective ~explanation arity =
+let abstract_type_decl ~injective arity =
   let rec make_params n =
     if n <= 0 then [] else Ctype.newvar() :: make_params (n-1) in
   Ctype.with_local_level_generalize begin fun () ->
     { type_params = make_params arity;
       type_arity = arity;
-      type_kind = Type_abstract explanation;
+      type_kind = Type_abstract Definition;
       type_private = Public;
       type_manifest = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
@@ -1911,28 +1911,24 @@ let abstract_type_decl ~injective ~explanation arity =
     }
   end
 
-let approx_type_decl ~explanation sdecl_list =
+let approx_type_decl sdecl_list =
   let scope = Ctype.create_scope () in
   List.map
     (fun sdecl ->
       let injective = sdecl.ptype_kind <> Ptype_abstract in
       (Ident.create_scoped ~scope sdecl.ptype_name.txt,
-       abstract_type_decl ~injective ~explanation
-        (List.length sdecl.ptype_params)))
+       abstract_type_decl ~injective (List.length sdecl.ptype_params)))
     sdecl_list
 
 (* Check the well-formedness conditions on type abbreviations defined
    within recursive modules. *)
 
-(* [abs_env] is an abstract environment without physical cycles.
-  It is used as a printing environment in the case of cycles.
-  [env] is the main typing environment, which may contain cycles. *)
-let check_recmod_typedecl ~abs_env env loc recmod_ids path decl =
+let check_recmod_typedecl env loc recmod_ids path decl =
   (* recmod_ids is the list of recursively-defined module idents.
      (path, decl) is the type declaration to be checked. *)
   let to_check path = Path.exists_free recmod_ids path in
-  check_well_founded_decl ~abs_env env loc path decl to_check;
-  check_regularity ~abs_env env loc path decl to_check;
+  check_well_founded_decl ~abs_env:env env loc path decl to_check;
+  check_regularity ~abs_env:env env loc path decl to_check;
   (* additional coherence check, as one might build an incoherent signature,
      and use it to build an incoherent module, cf. #7851 *)
   check_coherence env loc path decl
@@ -2365,7 +2361,7 @@ let report_error ~loc = function
   | External_with_non_syntactic_arity ->
       Location.errorf ~loc
         "This external declaration has a non-syntactic arity,@ \
-         its arity is greater than its syntactic arity."
+         its arity is greater than its syntatic arity."
 
 
 let () =

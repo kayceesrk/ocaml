@@ -298,8 +298,6 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | { pat_extra= (Tpat_constraint ct, _, _attrs) :: rem; _ } ->
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
                          sub.typ sub ct)
-    | { pat_extra = (Tpat_open (_path, lid, _env), _, _attrs) :: rem; _ } ->
-        Ppat_open (lid, sub.pat sub { pat with pat_extra=rem })
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
@@ -311,6 +309,14 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           | _ ->
               Ppat_var name
         end
+
+    (* We transform (_ as x) in x if _ and x have the same location.
+       The compiler transforms (x:t) into (_ as x : t).
+       This avoids transforming a warning 27 into a 26.
+     *)
+    | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _, _ty)
+         when pat_loc = pat.pat_loc ->
+       Ppat_var name
 
     | Tpat_alias (pat, _id, name, _, _ty) ->
         Ppat_alias (sub.pat sub pat, name)

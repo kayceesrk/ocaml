@@ -331,12 +331,12 @@ end = struct
         if flavor = Unification || is_in_scope name then
           let v = new_global_var () in
           let snap = Btype.snapshot () in
-          match unify env v ty with
-          | exception Unify err when is_in_scope name ->
-            raise (Error(loc, env, Type_mismatch err))
-          | exception _ -> Btype.backtrack snap
-          | () ->
-            begin match lookup_global_type_variable name with
+          if try unify env v ty; true
+            with
+                Unify err when is_in_scope name ->
+                  raise (Error(loc, env, Type_mismatch err))
+              | _ -> Btype.backtrack snap; false
+          then match lookup_global_type_variable name with
             | global_var ->
               r := (loc, v, global_var) :: !r;
               unused := false
@@ -347,8 +347,7 @@ end = struct
                                                   get_in_scope_names ())));
               let v2 = new_global_var () in
               r := (loc, v, v2) :: !r;
-              add ~unused name v2
-            end)
+              add ~unused name v2)
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
@@ -587,14 +586,11 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
       let mkfield l f =
         newty (Tvariant (create_row ~fields:[l,f] ~more:(newvar())
                            ~closed:true ~fixed:None ~name:None)) in
-      (* Using a reference to a map rather than a hash table gives us
-         a canonical order when iterating. *)
-      let module HMap = Numbers.Int.Map in
-      let hfields = ref HMap.empty in
+      let hfields = Hashtbl.create 17 in
       let add_typed_field loc l f =
         let h = Btype.hash_variant l in
         try
-          let (l',f') = HMap.find h !hfields in
+          let (l',f') = Hashtbl.find hfields h in
           (* Check for tag conflicts *)
           if l <> l' then raise(Error(styp.ptyp_loc, env, Variant_tags(l, l')));
           let ty = mkfield l f and ty' = mkfield l f' in
@@ -603,7 +599,7 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
           with Unify _trace ->
             raise(Error(loc, env, Constructor_mismatch (ty,ty')))
         with Not_found ->
-          hfields := HMap.add h (l, f) !hfields
+          Hashtbl.add hfields h (l,f)
       in
       let add_field row_context field =
         let rf_loc = field.prf_loc in
@@ -636,7 +632,7 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
                 Tconstr(p, tl, _) -> Some(p, tl)
               | _                 -> None
             in
-            name := if HMap.is_empty !hfields then nm else None;
+            name := if Hashtbl.length hfields <> 0 then None else nm;
             let fl = match get_desc (expand_head env cty.ctyp_type), nm with
               Tvariant row, _ when Btype.static_row row ->
                 row_fields row
@@ -666,7 +662,7 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
         if aliased then row_context else more_slot :: row_context
       in
       let tfields = List.map (add_field row_context) fields in
-      let fields = HMap.fold (fun _ p l -> p :: l) !hfields [] in
+      let fields = List.rev (Hashtbl.fold (fun _ p l -> p :: l) hfields []) in
       begin match present with None -> ()
       | Some present ->
           List.iter
@@ -727,19 +723,16 @@ and transl_type_aux env ~row_context ~aliased ~policy styp =
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
 and transl_fields env ~policy ~row_context o fields =
-  (* Using a reference to a map rather than a hash table gives us
-     a canonical order when iterating. *)
-  let module HMap = Misc.Stdlib.String.Map in
-  let hfields = ref HMap.empty in
+  let hfields = Hashtbl.create 17 in
   let add_typed_field loc l ty =
     try
-      let ty' = HMap.find l !hfields in
+      let ty' = Hashtbl.find hfields l in
       if is_equal env false [ty] [ty'] then () else
         try unify env ty ty'
         with Unify _trace ->
           raise(Error(loc, env, Method_mismatch (l, ty, ty')))
     with Not_found ->
-      hfields := HMap.add l ty !hfields in
+      Hashtbl.add hfields l ty in
   let add_field {pof_desc; pof_loc; pof_attributes;} =
     let of_loc = pof_loc in
     let of_attributes = pof_attributes in
@@ -785,7 +778,7 @@ and transl_fields env ~policy ~row_context o fields =
     { of_desc; of_loc; of_attributes; }
   in
   let object_fields = List.map add_field fields in
-  let fields = HMap.fold (fun s ty l -> (s, ty) :: l) !hfields [] in
+  let fields = Hashtbl.fold (fun s ty l -> (s, ty) :: l) hfields [] in
   let ty_init =
      match o with
      | Closed -> newty Tnil

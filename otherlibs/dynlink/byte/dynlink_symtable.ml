@@ -89,24 +89,14 @@ let primitives : (string, int) Hashtbl.t = Hashtbl.create 100
 #52 "bytecomp/dll.ml"
 (* Extract the name of a DLLs from its external name (xxx.so or -lxxx) *)
 
-let extract_dll_name (~suffixed, file) =
-  if not suffixed && Filename.check_suffix file Config.ext_dll then
+let extract_dll_name file =
+  if Filename.check_suffix file Config.ext_dll then
     Filename.chop_suffix file Config.ext_dll
+  else if String.length file >= 2 && String.sub file 0 2 = "-l" then
+    "dll" ^ String.sub file 2 (String.length file - 2)
   else
-    let file =
-      if String.starts_with ~prefix:"-l" file then
-      "dll" ^ String.sub file 2 (String.length file - 2)
-    else
-      file
-    in
-      if suffixed then
-#104 "otherlibs/dynlink/byte/dynlink_symtable.ml"
-        (* This name must be in sync with Misc.RuntimeID.stubslib *)
-        Printf.sprintf "%s-%s-%s" file Config.target Config.bytecode_runtime_id
-#66 "bytecomp/dll.ml"
-      else
-        file
-#110 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+    file (* will cause error later *)
+#100 "otherlibs/dynlink/byte/dynlink_symtable.ml"
 (* Specialized version of [Dll.{open_dll,open_dlls,find_primitive}] for the
     execution mode. *)
 let open_dll name =
@@ -212,7 +202,7 @@ let slot_for_literal cst =
   let n = GlobalMap.incr global_table in
   literal_table := (n, cst) :: !literal_table;
   n
-#282 "bytecomp/symtable.ml"
+#283 "bytecomp/symtable.ml"
 (* Relocate a block of object bytecode *)
 
 let patch_int buff pos n =
@@ -239,18 +229,18 @@ let patch_object buff patchlist =
       | (Reloc_primitive name, pos) ->
           patch_int buff pos (of_prim name))
     patchlist
-#327 "bytecomp/symtable.ml"
+#328 "bytecomp/symtable.ml"
 (* Functions for toplevel use *)
 
 (* Update the in-core table of globals *)
-#247 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#237 "otherlibs/dynlink/byte/dynlink_symtable.ml"
 module Meta = struct
 #16 "bytecomp/meta.ml"
 external global_data : unit -> Obj.t array = "caml_get_global_data"
 external realloc_global_data : int -> unit = "caml_realloc_global"
-#252 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#242 "otherlibs/dynlink/byte/dynlink_symtable.ml"
 end
-#331 "bytecomp/symtable.ml"
+#332 "bytecomp/symtable.ml"
 let update_global_table () =
   let ng = !global_table.cnt in
   if ng > Array.length(Meta.global_data()) then Meta.realloc_global_data ng;
@@ -262,7 +252,7 @@ let update_global_table () =
 
 type bytecode_sections =
   { symb: GlobalMap.t;
-    crcs: (string * Digest.BLAKE128.t option) list;
+    crcs: (string * Digest.t option) list;
     prim: string list;
     dlpt: string list }
 
@@ -274,16 +264,16 @@ external get_bytecode_sections : unit -> bytecode_sections =
 let init_toplevel () =
   let sect = get_bytecode_sections () in
   global_table := sect.symb;
-#278 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#268 "otherlibs/dynlink/byte/dynlink_symtable.ml"
   Dll.init ~dllpaths:sect.dlpt ~prims:sect.prim;
-#357 "bytecomp/symtable.ml"
+#358 "bytecomp/symtable.ml"
   sect.crcs
 
 (* Find the value of a global identifier *)
-#363 "bytecomp/symtable.ml"
+#364 "bytecomp/symtable.ml"
 let get_global_value global =
   (Meta.global_data()).(slot_for_getglobal global)
-#368 "bytecomp/symtable.ml"
+#369 "bytecomp/symtable.ml"
 (* Check that all compilation units referenced in the given patch list
    have already been initialized *)
 
@@ -324,17 +314,17 @@ let check_global_initialized patchlist =
 type global_map = GlobalMap.t
 
 let current_state () = !global_table
-#411 "bytecomp/symtable.ml"
+#412 "bytecomp/symtable.ml"
 let hide_additions (st : global_map) =
   if st.cnt > !global_table.cnt then
-#331 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#321 "otherlibs/dynlink/byte/dynlink_symtable.ml"
     failwith "Symtable.hide_additions";
-#414 "bytecomp/symtable.ml"
+#415 "bytecomp/symtable.ml"
   global_table :=
     {GlobalMap.
       cnt = !global_table.cnt;
       tbl = st.tbl }
-#433 "bytecomp/symtable.ml"
+#434 "bytecomp/symtable.ml"
 let is_defined_in_global_map (gmap : global_map) global =
   Global.Map.mem global gmap.tbl
 

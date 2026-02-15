@@ -30,7 +30,7 @@ else
   cat<<EOF
 ------------------------------------------------------------------------
 This should be fixable by just running tools/sync_stdlib_docs and
-reviewing the changes it makes.
+eviewing the changes it makes.
 ------------------------------------------------------------------------
 EOF
   git checkout .

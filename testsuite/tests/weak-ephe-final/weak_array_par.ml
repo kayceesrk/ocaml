@@ -1,8 +1,4 @@
-(* TEST
-  no-tsan; (* TSan detects the intentional data race *)
-  { bytecode; }
-  { native; }
-*)
+(* TEST *)
 
 let () = Random.self_init ()
 

@@ -198,13 +198,13 @@ let type_module_type_of_fwd :
 (* Additional validity checks on type definitions arising from
    recursive modules *)
 
-let check_recmod_typedecls ~abs_env env decls =
+let check_recmod_typedecls env decls =
   let recmod_ids = List.map fst decls in
   List.iter
     (fun (id, md) ->
       List.iter
         (fun path ->
-          Typedecl.check_recmod_typedecl ~abs_env env md.Types.md_loc recmod_ids
+          Typedecl.check_recmod_typedecl env md.Types.md_loc recmod_ids
                                          path (Env.find_type path env))
         (Mtype.type_paths env (Pident id) md.Types.md_type))
     decls
@@ -427,9 +427,7 @@ let check_well_formed_module env loc context mty =
       | Sig_module (id, _, mty, Trec_first, _) :: rem ->
           let (id_mty_l, rem) = extract_next_modules rem in
           begin try
-            let forced_env = Lazy.force env in
-            check_recmod_typedecls ~abs_env:forced_env forced_env
-              ((id, mty) :: id_mty_l)
+            check_recmod_typedecls (Lazy.force env) ((id, mty) :: id_mty_l)
           with Typedecl.Error (_, err) ->
             raise (Error (loc, Lazy.force env,
                           Badly_formed_signature(context, err)))
@@ -1038,9 +1036,7 @@ and approx_sig env ssg =
   | item :: srem ->
       match item.psig_desc with
       | Psig_type (rec_flag, sdecls) ->
-          let decls =
-            Typedecl.approx_type_decl ~explanation:Approx_recmod sdecls
-          in
+          let decls = Typedecl.approx_type_decl sdecls in
           let rem = approx_sig env srem in
           map_rec_type ~rec_flag
             (fun rs (id, info) -> Sig_type(id, info, rs, Exported)) decls rem
@@ -1346,6 +1342,17 @@ end = struct
   let check_class_type ?(info=`Exported) t loc id =
     check Sig_component_kind.Class_type t loc id info
 
+  let classify =
+    let open Sig_component_kind in
+    function
+    | Sig_type(id, _, _, _) -> Type, id
+    | Sig_module(id, _, _, _, _) -> Module, id
+    | Sig_modtype(id, _, _) -> Module_type, id
+    | Sig_typext(id, _, _, _) -> Extension_constructor, id
+    | Sig_value (id, _, _) -> Value, id
+    | Sig_class (id, _, _, _) -> Class, id
+    | Sig_class_type (id, _, _, _) -> Class_type, id
+
   let check_item ?info names loc kind id ids =
     let info =
       match info with
@@ -1356,11 +1363,9 @@ end = struct
 
   let check_sig_item ?info names loc (item:Signature_group.rec_group) =
     let check ?info names loc item =
-      let all =
-        List.map Types.classify_signature_item (Signature_group.flatten item)
-      in
-      let group = List.map (fun (_,id,_) -> id) all in
-      List.iter (fun (kind,id,_) -> check_item ?info names loc kind id group)
+      let all = List.map classify (Signature_group.flatten item) in
+      let group = List.map snd all in
+      List.iter (fun (kind,id) -> check_item ?info names loc kind id group)
         all
     in
     (* we can ignore x.pre_ghosts: they are eliminated by strengthening, and
@@ -1389,7 +1394,15 @@ end = struct
     in
     let simplify_item (component: Types.signature_item) =
       let user_kind, user_id, user_loc =
-        Types.classify_signature_item component
+        let open Sig_component_kind in
+        match component with
+        | Sig_value(id, v, _) -> Value, id, v.val_loc
+        | Sig_type (id, td, _, _) -> Type, id, td.type_loc
+        | Sig_typext (id, te, _, _) -> Extension_constructor, id, te.ext_loc
+        | Sig_module (id, _, md, _, _) -> Module, id, md.md_loc
+        | Sig_modtype (id, mtd, _) -> Module_type, id, mtd.mtd_loc
+        | Sig_class (id, c, _, _) -> Class, id, c.cty_loc
+        | Sig_class_type (id, ct, _, _) -> Class_type, id, ct.clty_loc
       in
       if Ident.Map.mem user_id to_remove.hide then
         None
@@ -1988,13 +2001,13 @@ and transl_recmodule_modtypes env sdecls =
          (id_shape, pmd.pmd_name, md, ()))
       ids sdecls
   in
-  let abs_env = make_env init in
+  let env0 = make_env init in
   let dcl1 =
     Warnings.without_warnings
-      (fun () -> transition abs_env init)
+      (fun () -> transition env0 init)
   in
   let env1 = make_env dcl1 in
-  check_recmod_typedecls ~abs_env env1 (map_mtys dcl1);
+  check_recmod_typedecls env1 (map_mtys dcl1);
   let dcl2 = transition env1 dcl1 in
 (*
   List.iter
@@ -2003,7 +2016,7 @@ and transl_recmodule_modtypes env sdecls =
     dcl2;
 *)
   let env2 = make_env dcl2 in
-  check_recmod_typedecls ~abs_env env2 (map_mtys dcl2);
+  check_recmod_typedecls env2 (map_mtys dcl2);
   let dcl2 =
     List.map2 (fun pmd (id_shape, id_loc, md, mty) ->
       let tmd =

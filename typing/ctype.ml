@@ -175,27 +175,23 @@ let proper_abbrevs tl abbrev =
 let current_level = s_ref 0
 let nongen_level = s_ref 0
 let global_level = s_ref 0
-let saved_levels = s_ref []
+let saved_level = s_ref []
 
 let get_current_level () = !current_level
-let init_def level =
-  assert (level <= generic_level);
-  current_level := level; nongen_level := level
-let save_levels () =
-  saved_levels := (!current_level, !nongen_level) :: !saved_levels
+let init_def level = current_level := level; nongen_level := level
 let begin_def () =
-  assert (!current_level < generic_level);
-  save_levels (); incr current_level; nongen_level := !current_level
+  saved_level := (!current_level, !nongen_level) :: !saved_level;
+  incr current_level; nongen_level := !current_level
 let begin_class_def () =
-  assert (!current_level < generic_level);
-  save_levels (); incr current_level
+  saved_level := (!current_level, !nongen_level) :: !saved_level;
+  incr current_level
 let raise_nongen_level () =
-  save_levels (); nongen_level := !current_level
+  saved_level := (!current_level, !nongen_level) :: !saved_level;
+  nongen_level := !current_level
 let end_def () =
-  match !saved_levels with
-  |  (cl, nl) :: levels ->
-      saved_levels := levels; current_level := cl; nongen_level := nl
-  | [] -> fatal_error "Ctype.end_def"
+  let (cl, nl) = List.hd !saved_level in
+  saved_level := List.tl !saved_level;
+  current_level := cl; nongen_level := nl
 let create_scope () =
   let level = !current_level + 1 in
   init_def level;
@@ -231,7 +227,7 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
     if ty.level = generic_level then () else
     match ty.desc with
     | Tvar _ when structure ->
-        (* In structure mode, we do not generalize type variables,
+        (* In structure mode, we do do not generalize type variables,
            so we need to lower their level, and move them to an outer pool.
            The goal of this mode is to allow unsharing inner nodes
            without introducing polymorphism.
@@ -293,7 +289,7 @@ let with_local_level_if_principal f ~post =
 let with_local_level_iter_if_principal f ~post =
   with_local_level_iter_if !Clflags.principal f ~post
 let with_level ~level f =
-  save_levels (); init_def level;
+  begin_def (); init_def level;
   wrap_end_def f
 let with_level_if cond ~level f =
   if cond then with_level ~level f else f ()
@@ -2337,7 +2333,7 @@ let is_instantiable env p =
 
 (* Two labels are considered compatible under certain conditions.
   - they are the same
-  - in classic mode, only optional labels are relevant
+  - in classic mode, only optional labels are relavant
   - in pattern mode, we act as if we were in classic mode. If not, interactions
     with GADTs from files compiled in classic mode would be unsound.
 *)
@@ -2370,7 +2366,7 @@ let rec expands_to_datatype env ty =
    witness could exist or not. Typically, this is the case for
    abstract types, which could be equal to anything, depending on
    their actual definition. As a result [mcomp] overapproximates
-   compatibility, i.e. when it says that two types are incompatible, we
+   compatibilty, i.e. when it says that two types are incompatible, we
    are sure that there exists no equality witness, but if it does not
    say so, there is no guarantee that such a witness could exist.
  *)
@@ -3416,6 +3412,8 @@ type filter_arrow_failure =
       }
   | Not_a_function
 
+exception Filter_arrow_failed of filter_arrow_failure
+
 type filtered_arrow =
   { ty_param : type_expr;
     ty_ret : type_expr;
@@ -3442,28 +3440,29 @@ let filter_arrow env t l ~param_hole =
     let t' = newty2 ~level (Tarrow (l, t1, t2, commu_ok)) in
     t', t1, t2
   in
-  match expand_head_trace env t with
-  | t ->
-    begin
-      match get_desc t with
-      | Tvar _ ->
-          let t', ty_param, ty_ret = function_type (get_level t) in
-          link_type t t';
-          Ok { ty_param; ty_ret }
-      | Tarrow(l', ty_param, ty_ret, _) ->
-          if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
-          then Ok { ty_param; ty_ret }
-          else Error (Label_mismatch
-                          { got = l; expected = l'; expected_type = t })
-      | _ ->
-          Error Not_a_function
-    end
-  | exception Unify_trace trace ->
+  let t =
+    try expand_head_trace env t
+    with Unify_trace trace ->
       let t', _, _ = function_type (get_level t) in
-      Error (Unification_error
-              (expand_to_unification_error
-                  env
-                  (Diff { got = t'; expected = t } :: trace)))
+      raise (Filter_arrow_failed
+               (Unification_error
+                  (expand_to_unification_error
+                     env
+                     (Diff { got = t'; expected = t } :: trace))))
+  in
+  match get_desc t with
+  | Tvar _ ->
+      let t', ty_param, ty_ret = function_type (get_level t) in
+      link_type t t';
+      { ty_param; ty_ret }
+  | Tarrow(l', ty_param, ty_ret, _) ->
+      if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
+      then { ty_param; ty_ret }
+      else raise (Filter_arrow_failed
+                    (Label_mismatch
+                       { got = l; expected = l'; expected_type = t }))
+  | _ ->
+      raise (Filter_arrow_failed Not_a_function)
 
 let is_really_poly env ty =
   let snap = Btype.snapshot () in

@@ -1,5 +1,4 @@
 (* TEST
- unset BUILD_PATH_PREFIX_MAP;
  debugger_script = "${test_source_directory}/input_script";
  debugger;
  shared-libraries;

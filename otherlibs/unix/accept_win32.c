@@ -23,17 +23,17 @@
 CAMLprim value caml_unix_accept(value cloexec, value sock)
 {
   CAMLparam0();
-  CAMLlocal2(fd, vaddr);
+  CAMLlocal2(fd, adr);
   SOCKET sconn = Socket_val(sock);
   SOCKET snew;
   value res;
-  struct sockaddr_storage addr;
-  socklen_t addr_len;
+  union sock_addr_union addr;
+  socklen_param_type addr_len;
   DWORD err = 0;
 
   addr_len = sizeof(addr);
   caml_enter_blocking_section();
-  snew = accept(sconn, (struct sockaddr *) &addr, &addr_len);
+  snew = accept(sconn, &addr.s_gen, &addr_len);
   if (snew == INVALID_SOCKET) err = WSAGetLastError ();
   caml_leave_blocking_section();
   if (snew == INVALID_SOCKET) {
@@ -42,9 +42,9 @@ CAMLprim value caml_unix_accept(value cloexec, value sock)
   }
   caml_win32_set_cloexec((HANDLE) snew, cloexec);
   fd = caml_win32_alloc_socket(snew);
-  vaddr = caml_unix_alloc_sockaddr((struct sockaddr *) &addr, addr_len, snew);
+  adr = caml_unix_alloc_sockaddr(&addr, addr_len, snew);
   res = caml_alloc_small(2, 0);
   Field(res, 0) = fd;
-  Field(res, 1) = vaddr;
+  Field(res, 1) = adr;
   CAMLreturn(res);
 }

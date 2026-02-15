@@ -14,7 +14,6 @@
 #**************************************************************************
 # Used by included Makefiles
 ROOTDIR = ../..
-SUBDIR_NAME = api_docgen/ocamldoc
 include ../Makefile.common
 vpath %.mli ../../stdlib $(DOC_COMPILERLIBS_DIRS)  $(DOC_STDLIB_DIRS)
 
@@ -122,4 +121,7 @@ build/latex/compilerlibs_input.tex: | build/latex
 
 .PHONY: install
 install:
-	$(call INSTALL_ITEMS_OPT, build/man/*.3o, man, $(INSTALL_MANDIR_LIBRARIES))
+	$(MKDIR) "$(INSTALL_LIBRARIES_MAN_DIR)"
+	if test -d build/man; then \
+	  $(INSTALL_DATA) build/man/*.3o "$(INSTALL_LIBRARIES_MAN_DIR)"; \
+	fi

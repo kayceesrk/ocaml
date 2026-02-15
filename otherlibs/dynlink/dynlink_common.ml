@@ -32,9 +32,9 @@ module Make (P : Dynlink_platform_intf.S) = struct
 
   type interface_dep =
     | Name  (* the only use of the interface can be via a module alias *)
-    | Contents of Digest.BLAKE128.t
+    | Contents of Digest.t
 
-  type implem = Digest.BLAKE128.t option * DT.filename * DT.implem_state
+  type implem = Digest.t option * DT.filename * DT.implem_state
 
   module State = struct
     type t = {
@@ -346,7 +346,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
       with_lock (fun ({unsafe_allowed; _ } as global) ->
           global.state <- check filename units global.state
               ~unsafe_allowed
-              ~priv
+              ~priv;
+          P.run_shared_startup handle;
         );
       List.iter
         (fun unit_header ->

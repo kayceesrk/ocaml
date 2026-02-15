@@ -78,7 +78,7 @@ let main argv ppf =
                          -output-obj";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Scheduling | P.Emit) as p) ->
         assert (P.is_compilation_pass p);
-        Compenv.fatalf
+        Printf.ksprintf Compenv.fatal
           "Options -i and -stop-after (%s) \
            are  incompatible with -pack, -a, -shared, -output-obj"
           (String.concat "|"

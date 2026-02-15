@@ -30,7 +30,9 @@
 #include <ws2tcpip.h>
 #include <wspiapi.h>
 #else /* Unix */
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #endif
 
 #ifdef __cplusplus
@@ -44,10 +46,7 @@ struct filedescr {
     SOCKET socket;
   } fd;                   /* Real windows handle */
   enum { KIND_HANDLE, KIND_SOCKET } kind;
-#ifdef __cplusplus
-  std::
-#endif
-  atomic_int crt_fd;      /* C runtime descriptor */
+  _Atomic int crt_fd;     /* C runtime descriptor */
   unsigned int flags_fd;  /* See FLAGS_FD_* */
 };
 

@@ -14,7 +14,6 @@
 #**************************************************************************
 
 ROOTDIR = ..
-SUBDIR_NAME = man
 include $(ROOTDIR)/Makefile.common
 
 MANPAGES = $(addsuffix .1,\
@@ -23,4 +22,5 @@ MANPAGES = $(addsuffix .1,\
 
 .PHONY: install
 install:
-	$(call INSTALL_ITEMS, $(MANPAGES), man, $(INSTALL_MANDIR_PROGRAMS))
+	$(MKDIR) '$(INSTALL_PROGRAMS_MAN_DIR)'
+	$(INSTALL_DATA) $(MANPAGES) '$(INSTALL_PROGRAMS_MAN_DIR)'
