@@ -16,6 +16,7 @@
 #include "caml/alloc.h"
 #include "caml/cont_ll.h"
 #include "caml/domain.h"
+#include "caml/fail.h"
 #include "caml/shared_heap.h"
 #include "caml/major_gc.h"
 #include "caml/fiber.h"
@@ -163,8 +164,14 @@ CAMLexport void caml_cont_discontinue_toclean(void)
     Caml_state->cont_major_toclean_head = next;
 
     caml_gc_log("  discontinue: %p", (void*)cur);
-    caml_callback2_exn(runtime_discontinue_fn, cur, exn);
+    value res = caml_callback2_exn(runtime_discontinue_fn, cur, exn);
     cur = Val_long(0);
+
+    if (Is_exception_result(res)) {
+      caml_gc_log("  discontinue raised exception: %p", (void*)Extract_exception(res));
+      processing_discontinue = 0;
+      caml_raise(Extract_exception(res));
+    }
   }
 
   caml_gc_log("cont_major: toclean done");

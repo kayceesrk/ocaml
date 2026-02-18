@@ -37,6 +37,9 @@ let _ = Callback.register_exception "Effect.Unhandled"
 let _ = Callback.register_exception "Effect.Continuation_already_resumed"
           Continuation_already_resumed
 
+(* Register a dedicated exception value for unreachable continuations *)
+let _ = Callback.register_exception "Effect.Gc_unreachable" Gc_unreachable
+
 type ('a, 'b) stack [@@immediate]
 type last_fiber [@@immediate]
 
@@ -63,16 +66,15 @@ module Deep = struct
   let discontinue k e =
     resume (take_cont_noexc k) (fun e -> raise e) e (cont_last_fiber k)
 
-  let runtime_discontinue k exn =
-    try discontinue k exn with _ -> ()
+  let runtime_discontinue (k : (_, unit) continuation) exn : unit =
+    try
+      discontinue k exn
+    with
+    | Gc_unreachable -> ()
+    | e -> raise e
 
-  (* Register discontinue for C runtime to call. The wrapper swallows the
-     propagated exception value so the runtime call always returns normally. *)
-  let () = Callback.register "Effect.runtime_discontinue" runtime_discontinue
-
-  (* Register a dedicated exception value for unreachable continuations so the
-     runtime does not have to rely on Invalid_argument. *)
-  let () = Callback.register_exception "Effect.Gc_unreachable" Gc_unreachable
+  (* Register runtime_discontinue for C runtime to call *)
+  let _ = Callback.register "Effect.runtime_discontinue" runtime_discontinue
 
   let discontinue_with_backtrace k e bt =
     resume (take_cont_noexc k) (fun e -> Printexc.raise_with_backtrace e bt)

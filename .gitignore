@@ -258,6 +258,8 @@ _*/
 /stdlib/labelled-*
 /stdlib/caml
 /stdlib/sys.ml
+/stdlib/runtime.info
+/stdlib/target_runtime.info
 
 /testsuite/**/*.result
 /testsuite/**/*.opt_result
