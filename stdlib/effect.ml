@@ -17,6 +17,7 @@ external perform : 'a t -> 'a = "%perform"
 
 type exn += Unhandled: 'a t -> exn
 exception Continuation_already_resumed
+exception Gc_unreachable
 
 let () =
   let printer = function
@@ -35,6 +36,9 @@ let _ = Callback.register_exception "Effect.Unhandled"
           (Unhandled Should_not_see_this__)
 let _ = Callback.register_exception "Effect.Continuation_already_resumed"
           Continuation_already_resumed
+
+(* Register a dedicated exception value for unreachable continuations *)
+let _ = Callback.register_exception "Effect.Gc_unreachable" Gc_unreachable
 
 type ('a, 'b) stack [@@immediate]
 type last_fiber [@@immediate]
@@ -61,6 +65,16 @@ module Deep = struct
 
   let discontinue k e =
     resume (take_cont_noexc k) (fun e -> raise e) e (cont_last_fiber k)
+
+  let runtime_discontinue (k : (_, unit) continuation) exn : unit =
+    try
+      discontinue k exn
+    with
+    | Gc_unreachable -> ()
+    | e -> raise e
+
+  (* Register runtime_discontinue for C runtime to call *)
+  let _ = Callback.register "Effect.runtime_discontinue" runtime_discontinue
 
   let discontinue_with_backtrace k e bt =
     resume (take_cont_noexc k) (fun e -> Printexc.raise_with_backtrace e bt)

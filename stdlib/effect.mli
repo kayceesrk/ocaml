@@ -33,6 +33,9 @@ exception Continuation_already_resumed
 (** Exception raised when a continuation is continued or discontinued more
     than once. *)
 
+exception Gc_unreachable
+(** Exception raised by the GC when continuation is unreachable. *)
+
 external perform : 'a t -> 'a = "%perform"
 (** [perform e] performs an effect [e].
 
@@ -92,6 +95,10 @@ module Deep : sig
     "caml_get_continuation_callstack"
   (** [get_callstack c n] returns a description of the top of the call stack on
       the continuation [c], with at most [n] entries. *)
+
+  val runtime_discontinue : ('a, unit) continuation -> exn -> unit
+  (** [runtime_discontinue k exn] is called by the GC to discontinue an
+      unreachable continuation [k] with exception {!Gc_unreachable}. *)
 end
 
 module Shallow : sig

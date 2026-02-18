@@ -59,6 +59,7 @@ int caml_mark_stack_is_empty(void);
 #endif
 void caml_orphan_ephemerons(caml_domain_state*);
 void caml_orphan_finalisers(caml_domain_state*);
+void caml_orphan_continuations(caml_domain_state*);
 
 /* This variable is only written with the world stopped,
    so it need not be atomic */

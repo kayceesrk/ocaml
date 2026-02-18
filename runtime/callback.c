@@ -26,6 +26,7 @@
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
+#include "caml/cont_ll.h"
 
 /* A note about callbacks and GC.  For best performance, a callback such as
      [caml_callback_exn(value closure, value arg)]
@@ -58,7 +59,10 @@ Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
   if (parent_stack == NULL) {
     return Val_unit;
   } else {
-    value cont = caml_alloc_2(Cont_tag, Val_ptr(parent_stack), Val_long(0));
+    /* Allocate continuation and register in minor todo list for GC tracking */
+    value cont = caml_alloc_3(Cont_tag, Val_ptr(parent_stack), 
+                              Val_ptr(parent_stack), Val_long(0));
+    caml_cont_insert_minor_todo(cont);
     Stack_parent(domain_state->current_stack) = NULL;
     return cont;
   }

@@ -41,6 +41,7 @@
 #include "caml/signals.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+#include "caml/cont_ll.h"
 
 struct generic_table CAML_TABLE_STRUCT(char);
 
@@ -274,13 +275,16 @@ static void oldify_one (void* st_v, value v, volatile value *p)
 
   if (tag == Cont_tag) {
     value stack_value = Field(v, 0);
-    CAMLassert(Wosize_hd(hd) == 2);
+    CAMLassert(Wosize_hd(hd) == 3);
     CAMLassert(infix_offset == 0);
-    result = alloc_shared(st->domain, 2, Cont_tag, Reserved_hd(hd));
+    result = alloc_shared(st->domain, 3, Cont_tag, Reserved_hd(hd));
     if( try_update_object_header(v, p, result, 0) ) {
       struct stack_info* stk = Ptr_val(stack_value);
       Field(result, 0) = stack_value;
       Field(result, 1) = Field(v, 1);
+      /* Clear Field(2) to prevent recursive promotion of linked list.
+         caml_cont_process_minor_todo rebuilds the list structure. */
+      Field(result, 2) = Val_long(0);
       if (stk != NULL) {
         caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
                         stk, 0);
@@ -665,6 +669,19 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   oldify_mopup (&st, 0);
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS_PROMOTE);
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
+
+  /* Process minor continuation todo list:
+     - Forwarded (reachable): add to cont_major_todo_head
+     - Not forwarded (unreachable): promote and add to cont_major_todo_head */
+#ifdef DEBUG
+  caml_cont_print_minor("before-process");
+#endif
+  caml_cont_process_minor_todo(&oldify_one, &st, domain);
+  /* Need to mopup any objects promoted by continuation processing */
+  oldify_mopup(&st, 0);
+#ifdef DEBUG
+  caml_cont_print_minor("after-process");
+#endif
 
   domain->young_ptr = domain->young_end;
   /* Trigger a GC poll when half of the minor heap is filled. At that point, a
