@@ -920,7 +920,7 @@ and transl_prim_1 env p arg dbg =
            barrier, so it must still be on the minor heap: nothing that
            can allocate may come between [cont] and the call. *)
         let cont =
-          make_alloc dbg Obj.cont_tag [int_const dbg 0]
+          make_alloc dbg Obj.cont_tag [int_const dbg 0; int_const dbg 0]
         in
         Cop(Capply typ_val,
          [Cconst_symbol ("caml_perform", dbg); eff; cont],

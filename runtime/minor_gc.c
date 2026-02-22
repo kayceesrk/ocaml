@@ -352,9 +352,10 @@ tail_call:
     if (result) {
       if (tag == Cont_tag) {
         CAMLassert(infix_offset == 0);
-        CAMLassert(sz == 1);
+        CAMLassert(sz == 2);
         struct stack_info* stk = Ptr_val(field0);
         Field(result, 0) = field0;
+        caml_final_cont_register_major(result);
         if (stk != NULL) {
           caml_scan_stack(&oldify_one, oldify_scanning_flags, st, stk, 0);
         }
