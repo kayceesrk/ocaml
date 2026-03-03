@@ -924,9 +924,7 @@ ENDFUNCTION caml_callback3_asm
 
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
+ * point to its parent at Handler_parent(Stack_handler(f)).
  */
 
 FUNCTION caml_perform
@@ -956,7 +954,7 @@ FUNCTION caml_perform
 #endif
         ld      8, Stack_handler(5)  /* r8 := current_stack -> handler */
         ld      9, Handler_parent(8) /* r9 := parent_stack */
-        cmpdi   9, 0
+        cmpdi   9, 0 /* is parent_stack NULL? */
         beq     1f
 #if defined(WITH_THREAD_SANITIZER)
         SWITCH_OCAML_TO_C
@@ -1025,7 +1023,7 @@ FUNCTION caml_reperform
      r4: continuation */
         ld      5, Caml_state(current_stack) /* r5 := current_stack */
         ld      6, 0(4)                      /* r6 := Val_ptr(cont_tail) */
-        addi    6, 6, -1
+        addi    6, 6, -1                     /* r6 := cont_tail */
         ld      TMP, Stack_handler(6)
         ld      7, Handler_parent(TMP) /* r7 := cont_head */
         std     5, Handler_parent(TMP) /* parent(cont_tail) := current_stack */

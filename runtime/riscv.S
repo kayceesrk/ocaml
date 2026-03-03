@@ -1003,9 +1003,7 @@ END_FUNCTION(caml_callback3_asm)
 
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
+ * point to its parent at Handler_parent(Stack_handler(f)).
  */
 
 FUNCTION(caml_perform)
@@ -1031,7 +1029,7 @@ L(do_perform):
 #endif
         ld      t3, Stack_handler(a2)  /* t3 := current_stack -> handler */
         ld      t4, Handler_parent(t3) /* t4 := parent_stack */
-        beqz    t4, 1f
+        beqz    t4, 1f /* is parent_stack NULL? */
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers a0-a4, t3 and t4 */
         addi    sp, sp, -56
@@ -1102,9 +1100,9 @@ FUNCTION(caml_resume)
         a1: fun
         a2: arg */
         addi    a3, a0, -1 /* a3 (cont_tail) = Ptr_val(a0) */
-        ld      a4, 0(a1)  /* code pointer */
     /* Check if stack null, then already used */
         beqz    a3, 1f
+        ld      a4, 0(a1)  /* code pointer */
    /* Load cont_head, the fiber at which we will resume */
         ld      a0, Stack_handler(a3)
         ld      a0, Handler_parent(a0) /* a0 = cont_head */
@@ -1128,7 +1126,7 @@ FUNCTION(caml_resume)
         CFI_ADJUST(-48)
         TSAN_SAVE_CALLER_REGS
     /* Signal to TSan all stack frames exited by the perform. */
-        mv      a2, a0                  /* arg3: fiber */
+        mv      a2, a0                  /* arg3: fiber (cont_head) */
         ld      a1, Stack_sp(a0)
         ld      a0, 8(a1)               /* arg1: pc of perform */
         /* This stack address adjustment is required to compensate the

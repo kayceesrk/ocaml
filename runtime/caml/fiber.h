@@ -159,6 +159,15 @@ struct c_stack_link {
  *  Retrofitting Effect Handlers onto OCaml, KC Sivaramakrishnan, et al.
  *  PLDI 2021
  *
+ * A continuation object represents a suspended computation as a chain of fibers
+ * (stack segments). It contains a pointer to the tail of this fiber chain
+ * (cont_tail), whose parent pointer cycles back to the fiber at which the
+ * effect was performed (cont_head).
+ *
+ * Stack pointers are tagged as integers to avoid being followed by the GC. In
+ * the code, the tagged pointer can be referred to as a 'fiber':
+ *     fiber := Val_ptr(stack)
+ *
  *  Native code
  *  -----------
  *
@@ -166,13 +175,6 @@ struct c_stack_link {
  * Pperform, Preperform and Presume make use of corresponding functions
  * implemented in the assembly files for an architecture (such as
  * runtime/amd64.S).
- *
- * A continuation object represents a suspended computation as a chain of
- * fibers (stack segments). It contains pointers to the head and tail of
- * this fiber chain (cont_head and cont_tail). Stack pointers are tagged
- * as integers to avoid being followed by the GC. In the code, the tagged
- * pointer can be referred to as a 'fiber':
- *     fiber := Val_ptr(stack)
  *
  * caml_runstack new_stack function argument
  *  caml_runstack launches a function (with an argument) in a new OCaml

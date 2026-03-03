@@ -939,9 +939,7 @@ ENDFUNCTION(G(caml_callback3_asm))
 /* Fibers */
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
+ * point to its parent at Handler_parent(Stack_handler(f)).
  */
 /******************************************************************************/
 
@@ -972,24 +970,22 @@ LBL(do_perform):
         clgfi   %r8, 0   /* is parent_stack NULL? */
         je      LBL(112)
 #if defined(WITH_THREAD_SANITIZER)
-    /* Save non-callee-saved registers r2-r6. r8 and r9 are callee-saved
-       and do not need to be preserved here. */
-        lay     %r15, -40(%r15)
-        CFI_ADJUST(40)
+    /* Save volatile registers r2-r5. r6, r8 and r9 are callee-saved
+       and do not need to be preserved across the C call. */
+        lay     %r15, -32(%r15)
+        CFI_ADJUST(32)
         stg     C_ARG_1, 0(%r15)
         stg     C_ARG_2, 8(%r15)
         stg     C_ARG_3, 16(%r15)
         stg     C_ARG_4, 24(%r15)
-        stg     %r6, 32(%r15)
     /* Match the TSan-enter made from caml_runstack */
         TSAN_EXIT_FUNCTION
-        lg      %r6, 32(%r15)
         lg      C_ARG_4, 24(%r15)
         lg      C_ARG_3, 16(%r15)
         lg      C_ARG_2, 8(%r15)
         lg      C_ARG_1, 0(%r15)
-        la      %r15, 40(%r15)
-        CFI_ADJUST(-40)
+        la      %r15, 32(%r15)
+        CFI_ADJUST(-32)
 #endif
         SWITCH_OCAML_STACKS(%r4, %r8)
     /* We have to update the Handler_parent after the switch because the

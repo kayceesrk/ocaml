@@ -1116,9 +1116,7 @@ END_FUNCTION(caml_callback3_asm)
 /* Fibers */
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
+ * point to its parent at Handler_parent(Stack_handler(f)).
  */
 /******************************************************************************/
 

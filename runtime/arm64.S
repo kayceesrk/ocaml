@@ -1055,9 +1055,7 @@ END_FUNCTION(caml_callback3_asm)
 
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
+ * point to its parent at Handler_parent(Stack_handler(f)).
  */
 
 FUNCTION(caml_perform)
@@ -1084,7 +1082,7 @@ L(do_perform):
 #endif
         ldr     x9, Stack_handler(x2)  /* x9 := current_stack -> handler */
         ldr     x10, Handler_parent(x9) /* x10 := parent_stack */
-        cbz     x10, 1f
+        cbz     x10, 1f /* is parent_stack NULL? */
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers x0, x1, x2, x3, x4, x9 and x10 */
         stp     x0, x1, [sp, -16]!
