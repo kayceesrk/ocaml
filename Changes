@@ -92,6 +92,14 @@ Working version
 
 ### Bug fixes:
 
+- #15252, #15368, #15369, #15371, #15380: check arguments to Unix.kill, waitpid,
+  alarm, mktime and Sys.signal before narrowing. Unix.alarm rejects negative
+  delays. On 64-bit Unix, getpwuid, getgrgid, setuid, setgid and initgroups
+  reject IDs below -1 or above UINT_MAX. Preserve large signal numbers,
+  runtime event integers and type IDs. Check the event registration limit
+  and Bigarray slice arity.
+  (KC Sivaramakrishnan, review by ??)
+
 - #14602: on Windows, Sys.rename and Unix.rename now succeed when the
   destination is an existing read-only file, as on POSIX systems.
   (Nicolás Ojeda Bär, review by Gabriel Scherer, Antonin Décimo,
@@ -368,6 +376,13 @@ OCaml 5.6.0
   the event stream alone.
   (Nick Barnes, review by Gabriel Scherer)
 
+- #14936: On AArch64, drop the memory-model fences around the atomic
+  read-modify-writes (`Atomic.exchange`, `Atomic.compare_and_set`,
+  `Atomic.fetch_and_add`) when they run as an LSE atomic, which makes the
+  fences redundant (detected at compile time via FEAT_LSE, or at run time for
+  outline-atomics builds).
+  (Sebastian Pop, review by Olivier Nicole, Gabriel Scherer, and Luc Maranget)
+
 ### Type system:
 
 * #11648, #14766, #14768, #14776, #14801, #14842, #14845: Keep expansion and
@@ -601,7 +616,7 @@ OCaml 5.6.0
   result is unchanged.
   (Nicolás Ojeda Bär, review by Vincent Laviron and Olivier Nicole)
 
-- #14848: Add Dynarray.stable_sort_sub, stable_sort and sort
+- #14848, #15386: Add Dynarray.stable_sort_sub, stable_sort and sort
   (Jeanne Pottier, review by Nicolás Ojeda Bär and Olivier Nicole)
 
 - #15064: deprecate Weak.get_copy
