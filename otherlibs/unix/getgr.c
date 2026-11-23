@@ -41,8 +41,19 @@ static value alloc_group_entry(const struct group *entry)
   CAMLreturn(res);
 }
 
-/* Arbitrary limit to prevent allocating too much memory */
-#define CAML_GETGR_R_SIZE_MAX (1024 * 64)
+/* The buffer grows until the entry fits or allocation fails; this limit
+   only keeps the doubled size from overflowing. */
+#define CAML_GETGR_R_SIZE_MAX (SIZE_MAX / 2)
+
+/* POSIX reports a missing entry as 0 with a NULL result, but glibc may
+   return one of these codes instead, depending on the NSS module
+   (see the Linux getgrnam(3) manual). */
+#if defined(HAVE_GETGRNAM_R) || defined(HAVE_GETGRGID_R)
+static int getgr_not_found(int e)
+{
+  return e == 0 || e == ENOENT || e == ESRCH || e == EBADF || e == EPERM;
+}
+#endif
 
 CAMLprim value caml_unix_getgrnam(value name)
 {
@@ -71,7 +82,7 @@ CAMLprim value caml_unix_getgrnam(value name)
   }
   if (entry == NULL) {
     caml_stat_free(buffer);
-    if (e != 0)
+    if (! getgr_not_found(e))
       caml_unix_error(e, "getgrnam", Nothing);
     caml_raise_not_found();
   }
@@ -118,7 +129,7 @@ CAMLprim value caml_unix_getgrgid(value gid)
   }
   if (entry == NULL) {
     caml_stat_free(buffer);
-    if (e != 0)
+    if (! getgr_not_found(e))
       caml_unix_error(e, "getgrgid", Nothing);
     caml_raise_not_found();
   }

@@ -116,6 +116,12 @@ Working version
 
 ### Bug fixes:
 
+- #15378, #15379: Unix.getgrnam and Unix.getgrgid raise Not_found when
+  getgrnam_r or getgrgid_r reports a missing group with ENOENT, ESRCH, EBADF
+  or EPERM, as glibc may do. They no longer raise ENOMEM for group entries
+  larger than 64 KiB; the buffer grows until the entry fits.
+  (KC Sivaramakrishnan, review by ????)
+
 - #15252, #15368, #15369, #15371, #15380: check arguments to Unix.kill, waitpid,
   alarm, mktime and Sys.signal before narrowing. Unix.alarm rejects negative
   delays. On Unix, getpwuid, getgrgid, setuid, setgid and initgroups
