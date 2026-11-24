@@ -513,6 +513,38 @@ struct stack_frame {
   void* retaddr;
 };
 
+/* Whether the saved frame pointer [p] points into [stack]. On RISC-V a saved
+   frame pointer is a CFA, just above its frame record, so it can equal
+   [Stack_high]. */
+Caml_inline bool frame_pointer_in_stack(struct stack_info* stack, void* p)
+{
+#if defined(TARGET_riscv)
+  return Stack_base(stack) < (value*)p && (value*)p <= Stack_high(stack);
+#else
+  return Stack_base(stack) <= (value*)p && (value*)p < Stack_high(stack);
+#endif
+}
+
+/* Follow the chain of frame records from [fp], in a stack copied from
+   [old_stack] at [delta] bytes from it, relocating each saved frame pointer
+   by [delta] for as long as it points inside [old_stack]. Returns the last
+   record visited, whose saved frame pointer does not point inside
+   [old_stack]. */
+static struct stack_frame* relocate_frame_chain(struct stack_frame* fp,
+                                                struct stack_info* old_stack,
+                                                ptrdiff_t delta)
+{
+  while (frame_pointer_in_stack(old_stack, fp->prev)) {
+    fp->prev = (struct stack_frame*)((char*)fp->prev + delta);
+#if defined(TARGET_riscv)
+    fp = fp->prev - 1; /* CFA - 16 = frame record */
+#else
+    fp = fp->prev;
+#endif
+  }
+  return fp;
+}
+
 /* Relocate by [delta] the frame pointers of the OCaml frames lying above the
    C frame described by [link], for as long as they point inside [old_stack].
    The OCaml frames have already been copied to the new stack, [link->sp] has
@@ -543,22 +575,49 @@ Caml_inline void relocate_frame_pointers(struct c_stack_link* link,
   CAMLassert(fp->prev == (struct stack_frame*)link->sp);
 #endif
 
-#if defined(TARGET_riscv)
-  while ((value*)fp->prev > Stack_base(old_stack) &&
-         (value*)fp->prev <= Stack_high(old_stack)) {
-    fp->prev = (struct stack_frame*)((char*)fp->prev + delta);
-    fp = fp->prev - 1; /* CFA - 16 = frame record */
-  }
-#else
-  while (Stack_base(old_stack) <= (value*)fp->prev &&
-         (value*)fp->prev < Stack_high(old_stack)) {
-    fp->prev = (struct stack_frame*)((char*)fp->prev + delta);
-    fp = fp->prev;
-  }
-#endif
+  (void)relocate_frame_chain(fp, old_stack, delta);
 }
 
 #endif /* WITH_FRAME_POINTERS */
+
+/* Allocate a stack of [wsize] words for a copy of [old], with [old]'s
+   handlers and the fiber id [id], and copy the used part of [old] into it,
+   at the same distance from [Stack_high]. In native code, the chain of
+   exception handlers holds addresses into the stack: relocate it, starting
+   from [*exn_ptr], or, if [exn_ptr] is NULL, from [old]'s own saved
+   [exception_ptr] (a suspended fiber). The copy has no parent. Returns
+   NULL if the stack cannot be allocated. Used by [caml_try_realloc_stack]
+   and [caml_continuation_clone]. */
+static struct stack_info* copy_stack(struct stack_info* old, mlsize_t wsize,
+                                     int64_t id, void** exn_ptr)
+{
+  uintnat used = Stack_high(old) - (value*)old->sp;
+  struct stack_info* new =
+    caml_alloc_stack_noexc(wsize,
+                           Stack_handle_value(old),
+                           Stack_handle_exception(old),
+                           Stack_handle_effect(old),
+                           id);
+  if (new == NULL) return NULL;
+  /* [wsize] is at least the size of the used part: realloc grows it, and a
+     clone copies a fiber at its own size (with the alignment word masked
+     off); a fiber never runs with less than [Stack_threshold] free below
+     [sp] ([caml_maybe_expand_stack]), which is more than that word. */
+  CAMLassert(Stack_high(new) - Stack_base(new) >= used);
+  memcpy(Stack_high(new) - used, Stack_high(old) - used,
+         used * sizeof(value));
+  new->sp = Stack_high(new) - used;
+#ifdef NATIVE_CODE
+  if (exn_ptr == NULL) {
+    new->exception_ptr = old->exception_ptr;
+    exn_ptr = &new->exception_ptr;
+  }
+  caml_rewrite_exception_stack(old, (value**)exn_ptr, new);
+#else
+  (void)exn_ptr;
+#endif
+  return new;
+}
 
 int caml_try_realloc_stack(asize_t required_space)
 {
@@ -585,22 +644,12 @@ int caml_try_realloc_stack(asize_t required_space)
                  (uintnat) wsize * sizeof(value));
   }
 
-  new_stack = caml_alloc_stack_noexc(wsize,
-                                     Stack_handle_value(old_stack),
-                                     Stack_handle_exception(old_stack),
-                                     Stack_handle_effect(old_stack),
-                                     old_stack->id);
-
+  /* The running stack's chain of exception handlers starts from the
+     domain's [exn_handler]. */
+  new_stack = copy_stack(old_stack, wsize, old_stack->id,
+                         &Caml_state->exn_handler);
   if (!new_stack) return 0;
-  memcpy(Stack_high(new_stack) - stack_used,
-         Stack_high(old_stack) - stack_used,
-         stack_used * sizeof(value));
-  new_stack->sp = Stack_high(new_stack) - stack_used;
   Stack_parent(new_stack) = Stack_parent(old_stack);
-#ifdef NATIVE_CODE
-  caml_rewrite_exception_stack(old_stack, (value**)&Caml_state->exn_handler,
-                              new_stack);
-#endif
 
   /* Update stack pointers in Caml_state->c_stack. It is possible to have
    * multiple c_stack_links to point to the same stack since callbacks are run
@@ -881,6 +930,22 @@ void caml_compact_young_conts(caml_domain_state* domain)
   }
 }
 
+/* Record [cont] in this domain's table, as [caml_perform] does (without
+   reusing a taken top entry): at the threshold, it goes into the reserve,
+   and the table is then compacted at once. If there is no room at all,
+   double the table first. Returns false if it cannot grow. */
+static bool record_young_cont(caml_domain_state* domain, value cont)
+{
+  if (domain->young_conts_ptr == domain->young_conts_end
+      && !resize_young_conts(domain, 2 * young_conts_size(domain)))
+    return false;
+  value* p = domain->young_conts_ptr;
+  *p = cont;
+  domain->young_conts_ptr = p + 1;
+  if (p == domain->young_conts_limit) caml_compact_young_conts(domain);
+  return true;
+}
+
 void caml_free_dead_young_continuations(caml_domain_state* domain)
 {
   value* base = domain->young_conts_base;
@@ -974,6 +1039,173 @@ void caml_continuation_unborrow(value cont, struct stack_info* stk)
   atomic_store_release(Op_atomic_val(cont), Val_ptr(stk));
 }
 
+/* Cloning a continuation. See fiber.h. */
+
+#if defined(NATIVE_CODE) && defined(WITH_FRAME_POINTERS)
+/* The bottom frame record of a fiber: the one whose saved frame pointer
+   links to the parent fiber, at the slot that [UPDATE_BASE_POINTER]
+   writes, a fixed distance below the handler. */
+Caml_inline struct stack_frame* fiber_bottom_record(struct stack_info* stack)
+{
+#if defined(TARGET_power)
+  /* power.S: -(16 + TRAP_SIZE + RESERVED_STACK), with TRAP_SIZE = 48 in a
+     frame-pointer build and RESERVED_STACK = 32. The record's first word
+     is the back chain. */
+  return (struct stack_frame*)((char*)stack->handler - (16 + 48 + 32));
+#else
+  /* amd64.S, arm64.S, riscv.S: 4 words of [caml_runstack] and the 2-word
+     record. */
+  return (struct stack_frame*)((char*)stack->handler - 48);
+#endif
+}
+
+/* The frame record that the saved frame pointer [p] designates. */
+Caml_inline struct stack_frame* frame_record(struct stack_frame* p)
+{
+#if defined(TARGET_riscv)
+  return p - 1; /* a saved s0 is a CFA, just above its record */
+#else
+  return p;
+#endif
+}
+
+/* Relocate the saved frame pointers of a copied chain: [src] is the
+   source head and [src_tail] the source tail; [copy] is the copy of the
+   head, its copies linked by [Stack_parent] (the copy of the tail has no
+   parent yet).
+   - Within a fiber: [SWITCH_OCAML_STACKS] pushes a frame record
+     ([ENTER_FUNCTION]) just before it saves [sp], so the innermost record
+     of a suspended fiber is at its saved [sp] (amd64.S, arm64.S, riscv.S;
+     on Power, the back chain word at the saved SP). Follow the records
+     from there to the fiber's bottom record, moving each saved frame
+     pointer by the copy distance. The walk ends at the bottom record,
+     not when an address leaves the source stack, so that a link outside
+     the fiber is never followed.
+   - Between fibers: the bottom record of a fiber links to its parent
+     fiber; shift it by the parent's copy distance. The tail's links to
+     whatever fiber last resumed the source; in the copy it is cleared,
+     and [caml_resume] writes it ([UPDATE_BASE_POINTER]).
+   On Power this relocates the back chain; the copies of r31 that
+   generated code spills in its frames are not relocated. */
+static void relocate_cloned_frame_pointers(struct stack_info* src,
+                                           struct stack_info* src_tail,
+                                           struct stack_info* copy)
+{
+  while (1) {
+    ptrdiff_t delta = (char*)Stack_high(copy) - (char*)Stack_high(src);
+    struct stack_frame* bottom = fiber_bottom_record(copy);
+    struct stack_frame* fp = (struct stack_frame*)copy->sp;
+    while (fp != bottom) {
+      /* A well-formed fiber links each record to the next one inside it. */
+      CAMLassert(frame_pointer_in_stack(src, fp->prev));
+      if (!frame_pointer_in_stack(src, fp->prev)) break;
+      fp->prev = (struct stack_frame*)((char*)fp->prev + delta);
+      fp = frame_record(fp->prev);
+    }
+    if (src == src_tail) {
+      bottom->prev = NULL;
+      break;
+    }
+    struct stack_info* src_parent = Stack_parent(src);
+    struct stack_info* copy_parent = Stack_parent(copy);
+    /* A fiber of a suspended chain other than the tail was last resumed by
+       its parent ([UPDATE_BASE_POINTER] in [caml_reperform]). */
+    CAMLassert(frame_pointer_in_stack(src_parent, bottom->prev));
+    if (frame_pointer_in_stack(src_parent, bottom->prev))
+      bottom->prev = (struct stack_frame*)
+        ((char*)bottom->prev
+         + ((char*)Stack_high(copy_parent) - (char*)Stack_high(src_parent)));
+    src = src_parent;
+    copy = copy_parent;
+  }
+}
+#endif
+
+/* Make sure that recording one more continuation in this domain's table
+   cannot fail, by allocating or growing the table now. */
+static bool reserve_young_cont(void)
+{
+  caml_domain_state* d = Caml_state;
+  if (d->young_conts_ptr < d->young_conts_end) return true;
+  caml_compact_young_conts(d);
+  if (d->young_conts_ptr < d->young_conts_end) return true;
+  return resize_young_conts(d, 2 * young_conts_size(d));
+}
+
+CAMLexport value caml_continuation_clone(value k)
+{
+  CAMLparam1(k);
+  CAMLlocal1(clone);
+  struct stack_info *tail, *stack, *copy_head = NULL, *copy_tail = NULL;
+  bool ok = true;
+
+  CAMLassert(Is_block(k) && Tag_val(k) == Cont_tag);
+  /* The OCaml allocation comes first: the new continuation, counted as
+     taken until the end. From the borrow below to the end, no GC may run,
+     since the copied stacks hold roots that no continuation reaches yet. */
+  clone = caml_alloc_1(Cont_tag, Val_ptr(NULL));
+
+  /* Raises if [k] has been resumed. While [k] is borrowed, a [continue] of
+     [k] waits, and so does a stop-the-world section requested meanwhile:
+     cloning a large chain delays both. */
+  tail = caml_continuation_borrow(k);
+  /* Room for recording the clone, so that recording it after the install
+     cannot fail. A C allocation, which does not run the GC; checked after
+     the borrow, so that [Continuation_already_resumed] takes precedence
+     over [Out_of_memory]. */
+  if (!reserve_young_cont()) {
+    caml_continuation_unborrow(k, tail);
+    caml_raise_out_of_memory();
+  }
+  {
+    CAMLnoalloc;
+    /* The chain runs from the head, [Stack_parent(tail)], to [tail]. A
+       suspended fiber holds only OCaml frames: a [perform] cannot cross a
+       C callback ([alloc_and_clear_stack_parent] in callback.c makes it
+       unhandled), so no C frame and no [c_stack_link] is captured. */
+    stack = Stack_parent(tail);
+    while (1) {
+      mlsize_t wsize = (Stack_high(stack) - Stack_base(stack)) & ~1;
+      int bucket = stack_cache_bucket(wsize);
+      bool cached = bucket != -1 && Caml_state->stack_cache[bucket] != NULL;
+      struct stack_info* copy =
+        copy_stack(stack, wsize, atomic_fetch_add(&fiber_id, 1), NULL);
+      if (copy == NULL) { ok = false; break; }
+      /* As [caml_alloc_stack]: memory that did not come from the stack
+         cache counts towards the pace of the minor GC. */
+      if (!cached) account_new_fiber_stack(copy);
+      if (copy_tail == NULL) copy_head = copy;
+      else Stack_parent(copy_tail) = copy;
+      copy_tail = copy;
+      if (stack == tail) break;
+      stack = Stack_parent(stack);
+    }
+#if defined(NATIVE_CODE) && defined(WITH_FRAME_POINTERS)
+    /* Before the unborrow: the source stacks may be resumed, and freed,
+       once [k] is given back. */
+    if (ok) relocate_cloned_frame_pointers(Stack_parent(tail), tail,
+                                           copy_head);
+#endif
+    caml_continuation_unborrow(k, tail);
+  }
+  if (!ok) {
+    /* The copies made so far are linked from [copy_head], ending with a
+       NULL parent. */
+    while (copy_head != NULL) {
+      struct stack_info* next = Stack_parent(copy_head);
+      caml_free_stack(copy_head);
+      copy_head = next;
+    }
+    caml_raise_out_of_memory();
+  }
+  Stack_parent(copy_tail) = copy_head;
+  atomic_store_release(Op_atomic_val(clone), Val_ptr(copy_tail));
+  /* [clone] is on this domain's minor heap, and the table has room. */
+  CAMLassert(Is_young(clone));
+  (void)record_young_cont(Caml_state, clone);
+  CAMLreturn(clone);
+}
+
 CAMLprim value caml_continuation_use (value cont)
 {
   value v = caml_continuation_use_noexc(cont);
@@ -999,6 +1231,7 @@ CAMLprim value caml_continuation_use_and_update_handler_noexc
   Stack_handle_effect(stk) = heff;
   return stack;
 }
+
 
 static const value * _Atomic caml_unhandled_effect_exn = NULL;
 static const value * _Atomic caml_continuation_already_resumed_exn = NULL;

@@ -5,10 +5,19 @@
 #include <caml/alloc.h>
 #include <caml/memory.h>
 #include <caml/threads.h>
+#include <caml/fiber.h>
 #include <ctime>
 
 extern "C" {
   CAMLprim value test_cxx(value);
+  CAMLprim value test_cxx_clone(value);
+}
+
+/* Refers to [caml_continuation_clone], declared in a public header, from
+   C++: the program links only if the declaration has C linkage. */
+value test_cxx_clone(value k)
+{
+  return caml_continuation_clone(k);
 }
 
 value test_cxx(value vunit)

@@ -318,6 +318,11 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
                              value** exn_ptr, struct stack_info *new_stack);
 #endif
 
+/* Take the stack of a continuation, to resume it. For the runtime's own
+   callers. A taken continuation counts as resumed: it cannot be put back.
+   To read a continuation's stack without resuming it, borrow it
+   ([caml_continuation_borrow], below); to copy it, use
+   [caml_continuation_clone]. */
 value caml_continuation_use (value cont);
 
 /* Borrowing. [caml_get_continuation_callstack] reads the stack of a
@@ -372,8 +377,9 @@ CAMLextern uintnat caml_current_stack_size(void);
 
    A borrowed continuation (see [caml_continuation_borrow]) is not taken,
    so it stays recorded. Borrowing is the way to get temporary access to a
-   continuation's stack. The free claims a continuation with a CAS, so its
-   stacks are freed at most once.
+   continuation's stack. [caml_continuation_clone] records the copy it
+   makes. The free claims a continuation with a CAS, so its stacks are
+   freed at most once.
 
    A continuation that was never taken and is found to be unreachable,
    either in the table after a minor collection or by the sweeper, has its
@@ -428,5 +434,29 @@ CAMLextern uintnat caml_young_conts_size(caml_domain_state* domain);
 
 
 #endif /* CAML_INTERNALS */
+
+#include "mlvalues.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* [caml_continuation_clone(k)] returns a new continuation that resumes a
+   copy of the computation suspended in [k], without resuming [k]: both can
+   then be resumed, once each. This is for libraries that implement
+   multi-shot continuations; [Effect] itself stays one-shot. Raises
+   [Effect.Continuation_already_resumed] if [k] has been resumed, and
+   otherwise [Out_of_memory] if the copy cannot be allocated. Both continuations are
+   reclaimed like any other when they become unreachable. While the stacks
+   are copied, a [continue] of [k] on another domain waits, and so does a
+   stop-the-world section: cloning a large continuation delays both. In
+   frame-pointer builds, the copy's chain of frame records (on Power, its
+   back chain) is relocated into the copy; on Power, the copies of r31
+   that generated code spills in its frames are not. */
+CAMLextern value caml_continuation_clone(value k);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CAML_FIBER_H */

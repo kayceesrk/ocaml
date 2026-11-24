@@ -14,6 +14,11 @@ Working version
   that is no longer used.
   (KC Sivaramakrishnan, review by ????)
 
+- #????: Add `caml_continuation_clone` to the C API, which copies a
+  continuation without resuming it, for libraries that implement multi-shot
+  continuations.
+  (KC Sivaramakrishnan, review by ????)
+
 - #????: With runtime warnings enabled (`OCAMLRUNPARAM=W`), print a
   warning when the runtime frees a continuation that was never resumed.
   (KC Sivaramakrishnan, review by ????)
