@@ -7,6 +7,12 @@ Working version
 
 ### Runtime system:
 
+- #????: `Effect.Deep.continue` (and the other ways of resuming a
+  continuation) no longer fails with `Continuation_already_resumed` when
+  another domain is reading the continuation's callstack with
+  `get_callstack`.
+  (KC Sivaramakrishnan, review by ????)
+
 - #15049: Add a runtime events lifecycle event EV_PROCESS_CREATE, emitted on
   all platforms when a child process is created by Unix.create_process and the
   functions built on it.
