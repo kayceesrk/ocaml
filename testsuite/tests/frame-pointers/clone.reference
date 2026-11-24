@@ -1,0 +1,8 @@
+original: 301
+clone: true links followed, 0 leave the copy
+clone resumed: 302
+control: 0 links followed, true leave the copy
+clone of a clone (cache 0): true links followed, 0 leave
+  resumed: 303 304 305
+clone of a clone (cache 128): true links followed, 0 leave
+  resumed: 303 304 305

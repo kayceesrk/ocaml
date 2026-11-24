@@ -13,6 +13,12 @@ Working version
   `get_callstack`.
   (KC Sivaramakrishnan, review by ????)
 
+- #????: Add `caml_continuation_clone` to the C API, which copies a
+  continuation without resuming it, for libraries that implement multi-shot
+  continuations. Remove `caml_continuation_replace`, an internal function
+  that such libraries used with `caml_continuation_use`.
+  (KC Sivaramakrishnan, review by ????)
+
 - #????: With runtime warnings enabled (`OCAMLRUNPARAM=W`), print a
   warning when the runtime frees a continuation that was never resumed.
   (KC Sivaramakrishnan, review by ????)

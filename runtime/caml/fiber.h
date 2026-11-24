@@ -318,15 +318,12 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
                              value** exn_ptr, struct stack_info *new_stack);
 #endif
 
+/* Take the stack of a continuation, to resume it. For the runtime's own
+   callers. A taken continuation counts as resumed: it cannot be put back.
+   To read a continuation's stack without resuming it, borrow it
+   ([caml_continuation_borrow], below); to copy it, use
+   [caml_continuation_clone]. */
 value caml_continuation_use (value cont);
-
-/* Put back the stack of a continuation that was previously taken with
-   caml_continuation_use. The GC must not be allowed to run between
-   continuation_use and continuation_replace. While the continuation is
-   taken, it is resumed as far as everyone else is concerned: a concurrent
-   [continue] fails. To read or copy a continuation's stack without
-   resuming it, borrow it instead (below). */
-void caml_continuation_replace(value cont, struct stack_info* stack);
 
 /* Borrowing. [caml_get_continuation_callstack] reads the stack of a
    continuation without taking it: [caml_continuation_borrow] swaps the
@@ -380,14 +377,9 @@ CAMLextern uintnat caml_current_stack_size(void);
 
    A borrowed continuation (see [caml_continuation_borrow]) is not taken,
    so it stays recorded. Borrowing is the way to get temporary access to a
-   continuation's stack. Known gap: a continuation that is taken
-   ([caml_continuation_use]) and put back ([caml_continuation_replace])
-   can lose its table entry in between (its top entry reused by [perform],
-   or dropped by a compaction), and its stacks are then not freed if it
-   dies young. No runtime function does this; it is no worse than
-   without reclamation, where no stack of a dropped continuation is
-   freed. The free claims a continuation with a CAS,
-   so its stacks are freed at most once.
+   continuation's stack. [caml_continuation_clone] records the copy it
+   makes. The free claims a continuation with a CAS, so its stacks are
+   freed at most once.
 
    A continuation that was never taken and is found to be unreachable,
    either in the table after a minor collection or by the sweeper, has its
@@ -442,5 +434,29 @@ CAMLextern uintnat caml_young_conts_size(caml_domain_state* domain);
 
 
 #endif /* CAML_INTERNALS */
+
+#include "mlvalues.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* [caml_continuation_clone(k)] returns a new continuation that resumes a
+   copy of the computation suspended in [k], without resuming [k]: both can
+   then be resumed, once each. This is for libraries that implement
+   multi-shot continuations; [Effect] itself stays one-shot. Raises
+   [Effect.Continuation_already_resumed] if [k] has been resumed, and
+   otherwise [Out_of_memory] if the copy cannot be allocated. Both continuations are
+   reclaimed like any other when they become unreachable. While the stacks
+   are copied, a [continue] of [k] on another domain waits, and so does a
+   stop-the-world section: cloning a large continuation delays both. In
+   frame-pointer builds, the copy's chain of frame records (on Power, its
+   back chain) is relocated into the copy; on Power, the copies of r31
+   that generated code spills in its frames are not. */
+CAMLextern value caml_continuation_clone(value k);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CAML_FIBER_H */
