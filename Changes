@@ -14,6 +14,10 @@ Working version
   that is no longer used.
   (KC Sivaramakrishnan, review by ????)
 
+- #????: With runtime warnings enabled (`OCAMLRUNPARAM=W`), print a
+  warning when the runtime frees a continuation that was never resumed.
+  (KC Sivaramakrishnan, review by ????)
+
 - #????: Free the fiber stacks of a continuation that becomes unreachable
   without having been resumed. No OCaml code runs: dropping a continuation
   now only stops leaking memory.

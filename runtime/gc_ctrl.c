@@ -417,7 +417,7 @@ CAMLprim value caml_runtime_parameters (value unit)
        /* t */ caml_params->trace_level,
        /* v */ caml_verb_gc,
        /* V */ caml_params->verify_heap,
-       /* W */ caml_runtime_warnings,
+       /* W */ atomic_load_relaxed(&caml_runtime_warnings),
        /* X */ tweaks ? tweaks : no_tweaks
        );
   free(tweaks);
@@ -431,14 +431,14 @@ CAMLprim value caml_runtime_parameters (value unit)
 
 CAMLprim value caml_ml_enable_runtime_warnings(value vbool)
 {
-  caml_runtime_warnings = Bool_val(vbool);
+  atomic_store_relaxed(&caml_runtime_warnings, Bool_val(vbool));
   return Val_unit;
 }
 
 CAMLprim value caml_ml_runtime_warnings_enabled(value unit)
 {
   CAMLassert (unit == Val_unit);
-  return Val_bool(caml_runtime_warnings);
+  return Val_bool(atomic_load_relaxed(&caml_runtime_warnings));
 }
 
 
