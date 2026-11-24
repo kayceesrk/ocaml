@@ -55,7 +55,11 @@ struct stack_info {
    *
    * Stacks may be unpooled if either the stack size is not 2**N multiple of
    * [caml_fiber_wsz] or the stack is bigger than pooled sizes. */
-  int cache_bucket;
+  int16_t cache_bucket;
+  /* Whether this stack has been counted towards the pace of the major GC
+     (see [caml_continuation_charge_stacks]). Packed with [cache_bucket] so
+     that the structure keeps its size. */
+  uint16_t major_charged;
   size_t size; /* only used when USE_MMAP_MAP_STACK is defined */
   uintnat magic;
   int64_t id;
@@ -344,6 +348,98 @@ value caml_make_unhandled_effect_exn (value effect);
 
 CAMLextern uintnat caml_live_stacks_memory(void);
 CAMLextern uintnat caml_current_stack_size(void);
+
+/* Reclaiming the stacks of unreachable continuations.
+
+   A continuation has one field, which holds [Val_ptr(cont_tail)], or
+   [Val_ptr(NULL)] once the continuation has been taken.
+
+   [perform] records each continuation that it allocates in the domain's
+   table [Caml_state->young_conts_*]. If the top entry has been taken
+   ([Val_ptr(NULL)]; a borrowed continuation, see below, has not), the new
+   continuation replaces it; otherwise it is pushed. The word below the
+   table's base holds a sentinel entry that is never taken, so this needs
+   no bounds check. The table is allocated with the domain, with 256
+   entries plus a small reserve (2.5 KB on 64-bit), so that no effect
+   operation has to check for it. When [perform] reaches [limit], the
+   end of the main part, it interrupts the domain (requesting no GC work)
+   and continues in the reserve. The next allocation polls before running
+   any OCaml code (see [caml_alloc_small_dispatch]), and the poll compacts
+   the table ([caml_compact_young_conts]): it keeps the entries that have
+   not been taken and doubles the table if they fill more than a quarter
+   of it. Every [perform] allocates its continuation first, so the
+   reserve does not fill in practice; if it does, [perform] does not
+   record the continuation. Any other reset of [young_limit] re-arms the
+   interrupt while the table is in its reserve ([caml_reset_young_limit]),
+   and if the table cannot grow out of its reserve, the poll requests a
+   minor GC, which empties it. The table's size thus follows the number of continuations
+   suspended at once, not the number of effects per minor cycle, and
+   filling it requests no GC work (except a minor GC if the table cannot
+   grow out of its reserve; and its poll can start GC work that was within
+   one allocation of its trigger). The minor GC empties it.
+
+   A borrowed continuation (see [caml_continuation_borrow]) is not taken,
+   so it stays recorded. Borrowing is the way to get temporary access to a
+   continuation's stack. Known gap: a continuation that is taken
+   ([caml_continuation_use]) and put back ([caml_continuation_replace])
+   can lose its table entry in between (its top entry reused by [perform],
+   or dropped by a compaction), and its stacks are then not freed if it
+   dies young. No runtime function does this; it is no worse than
+   without reclamation, where no stack of a dropped continuation is
+   freed. The free claims a continuation with a CAS,
+   so its stacks are freed at most once.
+
+   A continuation that was never taken and is found to be unreachable,
+   either in the table after a minor collection or by the sweeper, has its
+   stack chain freed. No OCaml code runs. Only [perform] leaves a
+   continuation untaken: the continuations made by [callback.c] are always
+   taken by [restore_stack_parent], and [perform] takes its continuation
+   itself when the effect is unhandled. */
+
+/* Pacing. Fiber stack memory is counted towards the pace of the GCs as
+   the out-of-heap memory of custom blocks is:
+   - minor GC: a stack newly obtained from the system (not from the stack
+     cache), when a fiber starts ([caml_alloc_stack]), grows
+     ([caml_try_realloc_stack]) or is cloned;
+   - major GC: when a continuation that has not been taken is promoted, the
+     stacks of its chain, each once in its lifetime: a stack is marked when
+     counted; the mark is cleared when a stack is allocated, fresh or from
+     the cache (not when it is freed); a grown stack keeps it and counts
+     only its growth.
+   [caml_continuation_charge_stacks] returns the bytes of the not yet
+   counted stacks of the chain of a continuation that has not been taken,
+   and marks them counted. */
+uintnat caml_continuation_charge_stacks(struct stack_info* cont_tail);
+
+/* Free the stack chain of a continuation that has not been taken and is
+   unreachable. */
+void caml_free_continuation_stacks(struct stack_info* cont_tail);
+
+/* Called on a GARBAGE [Cont_tag] block of the major heap. */
+void caml_finalise_dead_continuation(value cont);
+
+/* Called by the minor GC after its end barrier: free the stacks of this
+   domain's dead young continuations and empty the table. */
+void caml_free_dead_young_continuations(caml_domain_state* domain);
+
+/* Allocate the table of young continuations of a new domain (returns 0 on
+   failure), and free the (empty) table of a terminating one (no effect if
+   already freed). */
+int caml_init_young_conts(caml_domain_state* domain);
+void caml_free_young_conts(caml_domain_state* domain);
+
+/* Drop the taken entries of this domain's table of young continuations,
+   keeping the others in order, and double the table if it is still more
+   than a quarter full; if it is still in its reserve, request a minor GC.
+   Called when [caml_perform] reached the threshold (at the
+   next poll, [caml_poll_gc_work]), and from C where the runtime records a
+   continuation. Allocates nothing on the OCaml heap. */
+void caml_compact_young_conts(caml_domain_state* domain);
+
+/* Test hook, for the testsuite only (internal, not an API): the current
+   capacity of the table (0 if not allocated). */
+CAMLextern uintnat caml_young_conts_size(caml_domain_state* domain);
+
 
 #endif /* CAML_INTERNALS */
 

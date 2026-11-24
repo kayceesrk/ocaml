@@ -575,6 +575,36 @@ value* caml_shared_try_alloc(struct caml_heap_state* local, mlsize_t wosize,
   return p;
 }
 
+/* Called on each GARBAGE block that the sweeper (or the compactor's implicit
+   sweep of evacuated pools) frees: run the finaliser of a custom block, and
+   free the stacks of a continuation that was never resumed. The common case
+   is a single test, and the rest is out of line, to keep the sweeping loop
+   tight. */
+static Caml_noinline void finalise_garbage_block_slow(header_t* p, tag_t tag)
+{
+  if (tag == Custom_tag) {
+    void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
+    if (final_fun != NULL) final_fun(Val_hp(p));
+  } else {
+    caml_finalise_dead_continuation(Val_hp(p));
+  }
+}
+
+Caml_inline void finalise_garbage_block(header_t* p, header_t hd)
+{
+  static_assert(Cont_tag < Custom_tag, "");
+  tag_t tag = Tag_hd (hd);
+  if (CAMLunlikely(tag == Custom_tag || tag == Cont_tag)) {
+    /* A continuation that was resumed has nothing to free. (The size test
+       is the one of [caml_finalise_dead_continuation]: a [Cont_tag] block
+       made with [Obj] may have no field.) */
+    if (tag == Cont_tag && (Wosize_hd(hd) != 1
+                            || Field(Val_hp(p), 0) == Val_ptr(NULL)))
+      return;
+    finalise_garbage_block_slow(p, tag);
+  }
+}
+
 /* Sweeping of the major heap shared pools */
 static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
                          sizeclass sz, int release_to_global_pool) {
@@ -616,10 +646,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
       block */
       if (Has_status_hd(hd, garbage)) {
         CAMLassert(Whsize_hd(hd) <= wh);
-        if (Tag_hd (hd) == Custom_tag) {
-          void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
-          if (final_fun != NULL) final_fun(Val_hp(p));
-        }
+        finalise_garbage_block(p, hd);
 
         /* add to freelist. This could be optimised, we don't need
         to write the free header if we're going to merge it with a prior
@@ -738,10 +765,7 @@ static intnat large_alloc_sweep(struct caml_heap_state* local) {
      MARKED or NOT_MARKABLE, all of which are treated identically here. */
   hd = Hd_hp(p);
   if (Has_status_hd(hd, caml_global_heap_state.GARBAGE)) {
-    if (Tag_hd (hd) == Custom_tag) {
-      void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
-      if (final_fun != NULL) final_fun(Val_hp(p));
-    }
+    finalise_garbage_block((header_t*)p, hd);
 
     local->stats.large_words -=
       Whsize_hd(hd) + Wsize_bsize(LARGE_ALLOC_HEADER_SZ);
@@ -1448,10 +1472,7 @@ void caml_compact_heap(caml_domain_state* domain_state,
             /* We are implicitly sweeping pools in the evacuation set and thus
                we must remember to call finalisers for Custom blocks that would
                have been swept in a subsequent major cycle. */
-            if (Tag_hd (hd) == Custom_tag) {
-              void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
-              if (final_fun) final_fun(Val_hp(p));
-            }
+            finalise_garbage_block(p, hd);
 
             heap->stats.pool_live_blocks--;
             heap->stats.pool_live_words -= Whsize_hd(hd);

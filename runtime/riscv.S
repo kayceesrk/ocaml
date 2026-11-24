@@ -1141,6 +1141,30 @@ FUNCTION(caml_perform)
         ld      a2, Caml_state(current_stack) /* a2 := current_stack */
         addi    a3, a2, 1 /* a3 := Val_ptr(current_stack) */
         sd      a3, 0(a1) /* Initialize continuation */
+        CFI_REMEMBER_STATE
+    /*  Record the continuation in the table of young continuations
+        (runtime/caml/fiber.h). If the top entry has been taken, the new
+        continuation replaces it; otherwise it is pushed. The word below the
+        table holds a sentinel entry that is never taken, so there is no
+        bounds check. The load of an entry's field is a single aligned word
+        load, atomic on this architecture. At the threshold, interrupt (the
+        table is compacted at the next poll, see fiber.h; no GC is
+        requested) and continue in the reserve; if the reserve is full, do
+        not record the continuation. The rarer cases are out of line, after
+        the handled-effect path below, and are reached before the stack
+        switch: the CFI state is saved here and restored there. */
+        ld      t3, Caml_state(young_conts_ptr)
+        ld      t4, -8(t3) /* t4 := top entry */
+        ld      t4, 0(t4) /* t4 := Field(entry, 0) */
+        addi    t4, t4, -1 /* taken: Field(entry, 0) == Val_ptr(NULL) */
+        beqz    t4, L(young_conts_reuse)
+        ld      t4, Caml_state(young_conts_limit)
+        beq     t3, t4, L(young_conts_full)
+L(young_conts_store):
+        sd      a1, 0(t3)
+        addi    t3, t3, 8
+        sd      t3, Caml_state(young_conts_ptr)
+L(young_conts_done):
         mv      a4, a2 /* a4 := cont_head */
 L(do_perform):
     /*  a0: effect to perform
@@ -1189,9 +1213,25 @@ L(do_perform):
         sd      a4, Handler_parent(t3) /* Connect new cont_tail to cont_head */
         ld      a2, Handler_effect(t3) /* a2 := effect handler */
         tail    PLT(caml_apply2)
+    /*  Out-of-line cases of recording the continuation (see above),
+        with the unwind state of the code that branches here. */
+        CFI_RESTORE_STATE
+L(young_conts_reuse):
+        sd      a1, -8(t3)
+        j       L(young_conts_done)
+L(young_conts_full):
+        ld      a4, Caml_state(young_conts_end)
+        beq     t4, a4, L(young_conts_done)
+        sd      a4, Caml_state(young_conts_limit)
+        li      a4, -1
+        sd      a4, Caml_state(young_limit)
+        j       L(young_conts_store)
 1:
     /*  No parent stack. Switch back to original performer before raising
-        Effect.Unhandled. */
+        Effect.Unhandled. The fibers of the continuation run again, so mark
+        it as taken. */
+        li      t4, 1
+        sd      t4, 0(a1) /* Field(cont, 0) := Val_ptr(NULL) */
         SWITCH_OCAML_STACKS a2, a4
     /*  No parent stack. Raise Effect.Unhandled. */
 #if defined(WITH_THREAD_SANITIZER)
