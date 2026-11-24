@@ -1226,7 +1226,9 @@ ENDFUNCTION caml_callback3_asm
 
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)).
+ * point to its parent at Handler_parent(Stack_handler(f)). [caml_perform]
+ * records the continuations that it allocates in the table
+ * Caml_state->young_conts_* (see runtime/caml/fiber.h).
  */
 
 FUNCTION caml_perform
@@ -1236,6 +1238,29 @@ FUNCTION caml_perform
         ld      5, Caml_state(current_stack) /* r5 := current_stack */
         addi    6, 5, 1  /* r6 := Val_ptr(current_stack) */
         std     6, 0(4)  /* Initialize continuation */
+        CFI_REMEMBER_STATE
+  /* Record the continuation in the table of young continuations
+     (runtime/caml/fiber.h): replace a taken top entry, otherwise push; a
+     sentinel entry below the table is never taken. The load of an entry's
+     field is a single aligned word load, atomic on this architecture. At
+     the threshold, interrupt (the table is compacted at the next poll, see
+     fiber.h; no GC is requested) and continue in the reserve; if the
+     reserve is full, do not record. Rarer cases are out of line, reached
+     before the stack switch: the CFI state is saved here and restored
+     there. */
+        ld      8, Caml_state(young_conts_ptr)
+        ld      9, -8(8) /* r9 := top entry */
+        ld      9, 0(9)  /* r9 := Field(entry, 0) */
+        cmpdi   9, 1     /* taken: Field(entry, 0) == Val_ptr(NULL) */
+        beq     .Lyoung_conts_reuse
+        ld      9, Caml_state(young_conts_limit)
+        cmpld   8, 9
+        beq     .Lyoung_conts_full
+.Lyoung_conts_store:
+        std     4, 0(8)
+        addi    8, 8, 8
+        std     8, Caml_state(young_conts_ptr)
+.Lyoung_conts_done:
         mr      7, 5     /* r7 := cont_head */
 .Ldo_perform:
   /* r3: effect to perform
@@ -1291,9 +1316,26 @@ FUNCTION caml_perform
                                        /* r3 := effect to perform (1st arg) */
                                        /* r4 := continuation (2nd arg) */
         Far_tailcall(caml_apply2)
+  /* Out-of-line cases of recording the continuation (see above), with
+     the unwind state of the code that branches here. */
+        CFI_RESTORE_STATE
+.Lyoung_conts_reuse:
+        std     4, -8(8)
+        b       .Lyoung_conts_done
+.Lyoung_conts_full:
+        ld      7, Caml_state(young_conts_end)
+        cmpld   9, 7
+        beq     .Lyoung_conts_done
+        std     7, Caml_state(young_conts_limit)
+        li      7, -1
+        std     7, Caml_state(young_limit)
+        b       .Lyoung_conts_store
 1:
   /* No parent stack. Switch back to original performer before raising
-     Effect.Unhandled. */
+     Effect.Unhandled. The fibers of the continuation run again, so mark it
+     as taken. */
+        li      9, 1
+        std     9, 0(4)  /* Field(cont, 0) := Val_ptr(NULL) */
         SWITCH_OCAML_STACKS 5, 7
   /* No parent stack. Raise Effect.Unhandled. */
 #if defined(WITH_THREAD_SANITIZER)

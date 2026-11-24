@@ -503,7 +503,10 @@ linked list of such fibers.
 
 A new fiber is allocated for evaluating the computation enclosed by an effect
 handler. The fiber is freed when the computation returns to the caller either
-normally by returning a value or by raising an exception.
+normally by returning a value or by raising an exception. If the computation
+is suspended and its continuation is never resumed, the fibers of the
+continuation are freed by the garbage collector once the continuation becomes
+unreachable.
 
 At the point of "perform" in "foo" in the previous example, the program stack
 looks like this:
@@ -582,9 +585,13 @@ does not support multi-shot continuations.
 While the ``at most once resumption'' property of continuations is ensured with
 a dynamic check, there is no check to ensure that the continuations are resumed
 ``at least once''. It is left to the user to ensure that the captured
-continuations are resumed at least once. Not resuming continuations will leak
-the memory allocated for the fibers as well as any resources that the suspended
-computation may hold.
+continuations are resumed at least once. A continuation that is not resumed
+does not leak the memory allocated for its fibers: the garbage collector frees
+them once the continuation becomes unreachable. Dropping a continuation is
+nevertheless discouraged. The suspended computation never resumes, so its
+handlers and cleanup code, such as the "finally" function of "Fun.protect",
+never run, and any resources that the computation holds, such as file
+descriptors, are not released.
 
 One may install a finaliser on the captured continuation to ensure that the
 resources are freed:

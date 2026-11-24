@@ -1120,7 +1120,9 @@ END_FUNCTION(caml_callback3_asm)
 /* Fibers */
 /*
  * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)).
+ * point to its parent at Handler_parent(Stack_handler(f)). [caml_perform]
+ * records the continuations that it allocates in the table
+ * Caml_state->young_conts_* (see runtime/caml/fiber.h).
  */
 /******************************************************************************/
 
@@ -1131,6 +1133,29 @@ CFI_STARTPROC
         movq    Caml_state(current_stack), %rsi /* %rsi := current_stack */
         leaq    1(%rsi), %rdi /* %rdi := Val_ptr(current_stack) */
         movq    %rdi, 0(%rbx) /* Initialise continuation */
+        CFI_REMEMBER_STATE
+    /*  Record the continuation in the table of young continuations
+        (runtime/caml/fiber.h). If the top entry has been taken, the new
+        continuation replaces it; otherwise it is pushed. The word below the
+        table holds a sentinel entry that is never taken, so there is no
+        bounds check. The load of an entry's field is a single aligned word
+        load, atomic on this architecture. At the threshold, interrupt (the
+        table is compacted at the next poll, see fiber.h; no GC is
+        requested) and continue in the reserve; if the reserve is full, do
+        not record the continuation. The rarer cases are out of line, after
+        the handled-effect path below, and are reached before the stack
+        switch: the CFI state is saved here and restored there. */
+        movq    Caml_state(young_conts_ptr), %r10
+        movq    -8(%r10), %r11 /* %r11 := top entry */
+        cmpq    $1, 0(%r11) /* taken: Field(entry, 0) == Val_ptr(NULL) */
+        je      LBL(young_conts_reuse)
+        cmpq    Caml_state(young_conts_limit), %r10
+        je      LBL(young_conts_full)
+LBL(young_conts_store):
+        movq    %rbx, 0(%r10)
+        addq    $8, %r10
+        movq    %r10, Caml_state(young_conts_ptr)
+LBL(young_conts_done):
         movq    %rsi, %rdx /* %rdx := cont_head */
 LBL(do_perform):
     /*  %rdi: Val_ptr(current_stack)
@@ -1177,9 +1202,24 @@ LBL(do_perform):
         movq    %rdx, Handler_parent(%r11) /* Connect cont_tail to cont_head */
         movq    Handler_effect(%r11), %rdi /* %rdi := effect handler */
         jmp     GCALL(caml_apply2)
+    /*  Out-of-line cases of recording the continuation (see above),
+        with the unwind state of the code that branches here. */
+        CFI_RESTORE_STATE
+LBL(young_conts_reuse):
+        movq    %rbx, -8(%r10)
+        jmp     LBL(young_conts_done)
+LBL(young_conts_full):
+        movq    Caml_state(young_conts_end), %r11
+        cmpq    %r11, %r10
+        je      LBL(young_conts_done)
+        movq    %r11, Caml_state(young_conts_limit)
+        movq    $-1, Caml_state(young_limit)
+        jmp     LBL(young_conts_store)
 LBL(112):
     /* No parent stack. Switch back to original performer before raising
-       Effect.Unhandled. */
+       Effect.Unhandled. The fibers of the continuation run again, so mark it
+       as taken. */
+        movq    $1, 0(%rbx) /* Field(cont, 0) := Val_ptr(NULL) */
         movq    %rdx, %r10 /* %r10 := cont_head */
         SWITCH_OCAML_STACKS /* SWITCH_OCAML_STACK (source=%rsi, target=%r10) */
         ENTER_FUNCTION

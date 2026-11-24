@@ -164,6 +164,7 @@ struct oldify_state {
   status status;
   shared_heap_fast_data_p fast_data;
   uintnat live_bytes;
+  uintnat cont_stack_bytes; /* stacks of promoted continuations */
   uintnat pool_live_blocks;
   uintnat pool_live_words;
   uintnat pool_frag_words;
@@ -356,6 +357,13 @@ tail_call:
         CAMLassert(field0 != Val_cont_borrowed);
         struct stack_info* stk = Ptr_val(field0);
         Field(result, 0) = field0;
+        /* The stacks of a promoted continuation that has not been taken
+           can now only be reclaimed by the major GC (see fiber.h): count
+           them towards its pace, as the out-of-heap memory of a promoted
+           custom block is. Each stack is counted once in its lifetime,
+           however often its fiber is suspended and promoted again. */
+        if (stk != NULL)
+          st->cont_stack_bytes += caml_continuation_charge_stacks(stk);
         if (stk != NULL) {
           caml_scan_stack(&oldify_one, oldify_scanning_flags, st, stk, 0);
         }
@@ -526,6 +534,7 @@ static void minor_gc_leave_barrier
 
 typedef struct {
   bool locked_ephemerons;
+  uintnat cont_stack_bytes;
 } promote_result;
 
 static promote_result
@@ -693,6 +702,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
 
   CAML_EV_BEGIN(EV_MINOR_LOCAL_ROOTS_PROMOTE);
   (void)oldify_mopup (&st, 0); /* ignore result as we're not doing ephemerons */
+  result.cont_stack_bytes = st.cont_stack_bytes;
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS_PROMOTE);
   CAML_EV_END(EV_MINOR_LOCAL_ROOTS);
 
@@ -946,6 +956,11 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
   CAML_EV_BEGIN(EV_MINOR_FINALIZED);
   caml_gc_log("finalizing dead minor custom blocks");
   custom_finalize_minor(domain);
+  /* Same constraint as [custom_finalize_minor]: right after leaving the
+     barrier. */
+  caml_free_dead_young_continuations(domain);
+  if (prom.cont_stack_bytes > 0)
+    caml_adjust_gc_speed(prom.cont_stack_bytes, 0);
   CAML_EV_END(EV_MINOR_FINALIZED);
 
   CAML_EV_BEGIN(EV_MINOR_FINALIZERS_ADMIN);

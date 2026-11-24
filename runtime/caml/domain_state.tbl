@@ -205,5 +205,14 @@ DOMAIN_STATE(struct caml_exception_context*, external_raise)
 DOMAIN_STATE(struct memprof_domain_s *, memprof)
 DOMAIN_STATE(value *, memprof_young_trigger)
 
+DOMAIN_STATE(value*, young_conts_ptr)
+DOMAIN_STATE(value*, young_conts_base)
+DOMAIN_STATE(value*, young_conts_limit)
+DOMAIN_STATE(value*, young_conts_end)
+/* Table of the continuations allocated by [perform] on this domain's minor
+   heap since the last minor collection: [young_conts_base] <=
+   [young_conts_ptr] <= [young_conts_limit] <= [young_conts_end]. All four
+   are NULL until the table is allocated. See fiber.h. */
+
 DOMAIN_STATE(extra_params_area, extra_params)
 /* This member must occur last, because it is an array, not a scalar */

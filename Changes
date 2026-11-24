@@ -14,6 +14,11 @@ Working version
   that is no longer used.
   (KC Sivaramakrishnan, review by ????)
 
+- #????: Free the fiber stacks of a continuation that becomes unreachable
+  without having been resumed. No OCaml code runs: dropping a continuation
+  now only stops leaking memory.
+  (KC Sivaramakrishnan, review by ????)
+
 - #15049: Add a runtime events lifecycle event EV_PROCESS_CREATE, emitted on
   all platforms when a child process is created by Unix.create_process and the
   functions built on it.
