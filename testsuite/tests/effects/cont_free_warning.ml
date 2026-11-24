@@ -1,0 +1,44 @@
+(* TEST
+ ocamlrunparam += ",W=1";
+*)
+
+(* With runtime warnings enabled, the runtime reports each continuation
+   that it reclaims without it having been resumed. *)
+
+open Effect
+open Effect.Deep
+
+type _ t += Yield : unit t
+
+let gen () : (unit, unit) continuation option =
+  let r : (unit, unit) continuation option ref = ref None in
+  match_with (fun () -> perform Yield) ()
+    { retc = (fun () -> ());
+      exnc = raise;
+      effc = fun (type a) (e : a t) ->
+        match e with
+        | Yield -> Some (fun (k : (a, unit) continuation) -> r := Some k)
+        | _ -> None };
+  !r
+
+let[@inline never] promote_then_drop () =
+  let k = gen () in
+  Gc.full_major ();
+  ignore (Sys.opaque_identity k)
+
+let () =
+  print_endline "dropped young"; flush stdout;
+  ignore (gen ());
+  Gc.full_major ();
+  print_endline "dropped after promotion"; flush stdout;
+  promote_then_drop ();
+  Gc.full_major ();
+  Gc.full_major ();
+  print_endline "resumed"; flush stdout;
+  (match gen () with Some k -> continue k () | None -> ());
+  Gc.full_major ();
+  print_endline "warnings disabled"; flush stdout;
+  Sys.enable_runtime_warnings false;
+  ignore (gen ());
+  Gc.full_major ();
+  print_endline "done"

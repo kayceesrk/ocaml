@@ -244,16 +244,18 @@ CAMLexport int caml_umul_overflow(uintnat a, uintnat b, uintnat * res)
 
 /* Runtime warnings */
 
-uintnat caml_runtime_warnings = 0;
-static int caml_runtime_warnings_first = 1;
+/* Both flags are atomic: warnings can be emitted by several domains at
+   once, for instance by the GC when it reclaims continuations. */
+atomic_uintnat caml_runtime_warnings = 0;
+static atomic_uintnat caml_runtime_warnings_first = 1;
 
 CAMLextern int caml_runtime_warnings_active(void)
 {
-  if (!caml_runtime_warnings) return 0;
-  if (caml_runtime_warnings_first) {
+  if (!atomic_load_relaxed(&caml_runtime_warnings)) return 0;
+  if (atomic_load_relaxed(&caml_runtime_warnings_first)
+      && atomic_exchange(&caml_runtime_warnings_first, 0)) {
     fprintf(stderr, "[ocaml] (use Sys.enable_runtime_warnings to control "
                     "these warnings)\n");
-    caml_runtime_warnings_first = 0;
   }
   return 1;
 }

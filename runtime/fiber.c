@@ -732,6 +732,11 @@ void caml_free_continuation_stacks(struct stack_info* cont_tail)
      [cont_tail] is [cont_head]. Free it from the head to the tail. */
   struct stack_info* stack = Stack_parent(cont_tail);
   CAMLassert(stack != NULL);
+  /* This can run inside the stop-the-world minor GC, once per dying
+     continuation; warnings are off by default. */
+  if (caml_runtime_warnings_active())
+    fprintf(stderr,
+            "[ocaml] continuation dies without being resumed\n");
   while (1) {
     struct stack_info* next = Stack_parent(stack);
     bool last = (stack == cont_tail);

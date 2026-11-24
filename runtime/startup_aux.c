@@ -125,7 +125,10 @@ void caml_parse_startup_params(struct caml_params *params, const char *opt)
       atomic_store_relaxed(&caml_verb_gc, val);
       break;
     case 'V': scanmult (opt, &params->verify_heap); break;
-    case 'W': scanmult (opt, &caml_runtime_warnings); break;
+    case 'W':
+      scanmult (opt, &val);
+      atomic_store_relaxed(&caml_runtime_warnings, val);
+      break;
     case 'X': {
       const char *name = opt;
       while (*opt != '=' && *opt != ',' && *opt != '\0') opt++;
